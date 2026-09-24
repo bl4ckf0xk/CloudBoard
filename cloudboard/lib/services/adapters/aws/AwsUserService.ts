@@ -8,6 +8,7 @@ import { User, UserRole, DeptId } from '../../types';
 import { awsFetch } from './awsClient';
 import { logger } from '@/lib/logger';
 import { INITIAL_USERS } from '../local/seedData';
+import { migrateUsers } from '../local/LocalUserService';
 
 // Map Department names from DynamoDB to CloudBoard DeptId tokens
 const DEPT_NAME_TO_ID: Record<string, DeptId> = {
@@ -117,15 +118,22 @@ export class AwsUserService implements IUserService {
       const data = await awsFetch<{ members?: any[]; Users?: any[] }>('/members');
       const rawList = data.members || data.Users || [];
       if (Array.isArray(rawList) && rawList.length > 0) {
-        const users = rawList.map(mapAwsMemberToUser);
+        const users = migrateUsers(rawList.map(mapAwsMemberToUser));
         this.cachedUsers = users;
         this.lastFetch = now;
+        if (typeof window !== 'undefined') {
+          try {
+            window.localStorage.setItem('cloudboard_members', JSON.stringify(users));
+          } catch {}
+        }
         return users;
       }
       if (this.cachedUsers && this.cachedUsers.length > 0) {
         return this.cachedUsers;
       }
-      return INITIAL_USERS;
+      const initialMigrated = migrateUsers(INITIAL_USERS);
+      this.cachedUsers = initialMigrated;
+      return initialMigrated;
     } catch (err: unknown) {
       logger.warn('[AwsUserService] Failed to fetch users from AWS API, using fallback data:', err);
       if (!this.cachedUsers || this.cachedUsers.length === 0) {
@@ -135,13 +143,17 @@ export class AwsUserService implements IUserService {
             if (raw) {
               const parsed = JSON.parse(raw);
               if (Array.isArray(parsed) && parsed.length > 0) {
-                this.cachedUsers = parsed;
-                return parsed;
+                const migrated = migrateUsers(parsed);
+                this.cachedUsers = migrated;
+                window.localStorage.setItem('cloudboard_members', JSON.stringify(migrated));
+                return migrated;
               }
             }
           } catch {}
         }
-        return INITIAL_USERS;
+        const initialMigrated = migrateUsers(INITIAL_USERS);
+        this.cachedUsers = initialMigrated;
+        return initialMigrated;
       }
       return this.cachedUsers;
     }
@@ -249,6 +261,7 @@ export class AwsUserService implements IUserService {
     if (typeof window !== 'undefined') {
       try {
         window.localStorage.setItem('cloudboard_members', JSON.stringify(users));
+        window.localStorage.setItem(`cloudboard_user_points_${targetUserId}`, String(Math.max(0, newPoints)));
       } catch {}
     }
 

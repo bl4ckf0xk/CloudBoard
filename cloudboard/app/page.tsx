@@ -404,17 +404,18 @@ export default function HomePage() {
   );
 
   const approvedSubmissions = useMemo(
-    () => submissions.filter((s) => s.status === 'approved'),
+    () => submissions.filter((s) => s.status === 'approved' || (s.status as any) === 'confirmed'),
     [submissions]
   );
 
   // Top 5 members for leaderboard
   const topMembers = useMemo(() => {
-    let filtered = [...enrichedUsers];
+    const nonLeaders = enrichedUsers.filter((u) => u.role !== 'leader');
+    let pool = nonLeaders.length > 0 ? nonLeaders : enrichedUsers;
     if (selectedDeptFilter !== 'all') {
-      filtered = filtered.filter((u) => u.deptId === selectedDeptFilter);
+      pool = enrichedUsers.filter((u) => u.deptId === selectedDeptFilter);
     }
-    return filtered.sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0)).slice(0, 5);
+    return pool.sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0)).slice(0, 5);
   }, [enrichedUsers, selectedDeptFilter]);
 
   const topScore = topMembers[0]?.totalPoints || 1;

@@ -1010,6 +1010,9 @@ export default function LeaderDashboardPage() {
   const handlePointOverride = async (userId: string, newPoints: number) => {
     try {
       await userService.overrideMemberPoints(currentUser.id, userId, newPoints);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(`cloudboard_user_points_${userId}`, String(newPoints));
+      }
       setUsers((prev) =>
         prev.map((u) => (u.id === userId ? { ...u, totalPoints: newPoints } : u))
       );
@@ -1057,8 +1060,15 @@ export default function LeaderDashboardPage() {
     });
   }, [enrichedUsers, deptFilter, roleFilter, search]);
 
-  const topPerformers = useMemo(() => {
-    return [...enrichedUsers].sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0)).slice(0, 3);
+  const topPerformer = useMemo(() => {
+    // Non-leader contributors with points
+    const contributors = enrichedUsers.filter((u) => u.role !== 'leader');
+    const sortedContributors = [...contributors].sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
+    if (sortedContributors.length > 0 && (sortedContributors[0].totalPoints || 0) > 0) {
+      return sortedContributors[0];
+    }
+    // Fallback to highest point earner overall
+    return [...enrichedUsers].sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0))[0] || null;
   }, [enrichedUsers]);
 
   if (!isLeader) {
@@ -1186,8 +1196,8 @@ export default function LeaderDashboardPage() {
         />
         <StatCard
           label="Top Performer"
-          value={topPerformers[0]?.totalPoints.toLocaleString() ?? '0'}
-          sub={topPerformers[0]?.name ?? 'None'}
+          value={topPerformer ? topPerformer.name : 'None'}
+          sub={topPerformer ? `${(topPerformer.totalPoints || 0).toLocaleString()} pts · ${deptMap.get(topPerformer.deptId)?.shortName || 'Contributor'}` : 'No points awarded yet'}
           icon={<Trophy size={20} />}
         />
         <StatCard

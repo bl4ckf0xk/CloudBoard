@@ -204,8 +204,9 @@ export default function PointsBreakdown({ user }: PointsBreakdownProps) {
   }, [user.id, user.deptId]);
 
   const data: BreakdownData = useMemo(() => {
+    const isApproved = (s: PointSubmission) => s.status === 'approved' || (s.status as any) === 'confirmed';
     const approved = submissions.filter(
-      (s) => isUserMatch(s.targetUserId, user) && s.status === 'approved'
+      (s) => isUserMatch(s.targetUserId, user) && isApproved(s)
     );
 
     const homePts = approved
@@ -231,7 +232,7 @@ export default function PointsBreakdown({ user }: PointsBreakdownProps) {
       crossPercent: total > 0 ? (crossPts / total) * 100 : 0,
       categoryBreakdown,
     };
-  }, [submissions, user.id]);
+  }, [submissions, user]);
 
   const deptColor = dept?.color ?? '#16a34a';
 

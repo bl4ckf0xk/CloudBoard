@@ -47,8 +47,8 @@ function normalizeDept(rawDept?: string): DeptId {
 function normalizeStatus(rawStatus?: string): SubmissionStatus {
   if (!rawStatus) return 'pending';
   const s = rawStatus.toLowerCase().trim();
-  if (s === 'approved') return 'approved';
-  if (s === 'rejected') return 'rejected';
+  if (s === 'approved' || s === 'confirmed' || s === 'accepted' || s === 'completed') return 'approved';
+  if (s === 'rejected' || s === 'denied' || s === 'declined') return 'rejected';
   return 'pending';
 }
 
@@ -61,20 +61,47 @@ function deriveCategory(title = '', reason = ''): SubmissionCategory {
   return 'collaboration';
 }
 
+function cleanId(rawId?: any): string {
+  if (!rawId) return '';
+  return String(rawId).trim().replace(/^POINT#/i, '').replace(/^MEMBER#/i, '').replace(/^USER#/i, '');
+}
+
 export function mapAwsPointToSubmission(raw: any): PointSubmission {
-  const id = raw.PK ? raw.PK.replace('POINT#', '') : raw.id || `point-${Date.now()}`;
+  const id = raw.PK ? cleanId(raw.PK) : raw.id || `point-${Date.now()}`;
   const homeDept = normalizeDept(raw.submitted_by_dept || raw.home_dept);
   const targetDept = normalizeDept(raw.target_dept);
   const status = normalizeStatus(raw.status);
   const reason = raw.description || raw.reason || raw.title || 'Contribution recognition';
   const category = (raw.category as SubmissionCategory) || deriveCategory(raw.title, reason);
-  const rawPoints = raw.points ?? raw.total_points ?? raw.points_requested ?? 0;
+  const rawPoints = raw.points ?? raw.total_points ?? raw.points_requested ?? raw.point ?? raw.score ?? 0;
   const points = typeof rawPoints === 'number' ? rawPoints : parseInt(String(rawPoints) || '0', 10) || 0;
+
+  const rawTarget =
+    raw.target_user_id ||
+    raw.targetUserId ||
+    raw.target_user ||
+    raw.targetUser ||
+    raw.recipient ||
+    raw.recipient_id ||
+    raw.recipientId ||
+    raw.user_id ||
+    raw.userId ||
+    raw.submitted_by ||
+    raw.submitterId ||
+    'user-unknown';
+
+  const rawSubmitter =
+    raw.submitted_by ||
+    raw.submitterId ||
+    raw.submitter ||
+    raw.created_by ||
+    raw.createdBy ||
+    'user-unknown';
 
   return {
     id,
-    submitterId: raw.submitted_by || raw.submitterId || 'user-unknown',
-    targetUserId: raw.target_user_id || raw.targetUserId || raw.submitted_by || 'user-unknown',
+    submitterId: cleanId(rawSubmitter) || 'user-unknown',
+    targetUserId: cleanId(rawTarget) || 'user-unknown',
     home_dept: homeDept,
     target_dept: targetDept,
     cross_dept: homeDept !== targetDept,
@@ -302,13 +329,19 @@ export class AwsSubmissionService implements ISubmissionService {
               (u: any) =>
                 (u.id && u.id.toLowerCase() === targetLower) ||
                 (u.email && u.email.toLowerCase() === targetLower) ||
-                (u.name && u.name.toLowerCase() === targetLower)
+                (u.name && u.name.toLowerCase() === targetLower) ||
+                (u.id && targetLower.includes(u.id.toLowerCase()))
             );
             if (uIdx !== -1) {
               parsedUsers[uIdx].totalPoints = (parsedUsers[uIdx].totalPoints || 0) + updatedSub.points;
               window.localStorage.setItem('cloudboard_members', JSON.stringify(parsedUsers));
+              window.localStorage.setItem(`cloudboard_user_points_${parsedUsers[uIdx].id}`, String(parsedUsers[uIdx].totalPoints));
             }
           }
+        }
+        if (updatedSub.targetUserId) {
+          const currentPts = parseInt(window.localStorage.getItem(`cloudboard_user_points_${updatedSub.targetUserId}`) || '0', 10);
+          window.localStorage.setItem(`cloudboard_user_points_${updatedSub.targetUserId}`, String(currentPts + updatedSub.points));
         }
         window.dispatchEvent(new CustomEvent('contribution-submitted', { detail: updatedSub }));
       } catch (e) {

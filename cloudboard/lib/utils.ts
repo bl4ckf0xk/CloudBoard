@@ -5,34 +5,64 @@
 
 import { User, PointSubmission, UserRole } from './services/types';
 
+const SEED_SUBMISSION_IDS = new Set([
+  'sub-001', 'sub-002', 'sub-003', 'sub-004', 'sub-005',
+  'sub-006', 'sub-007', 'sub-008', 'sub-009', 'sub-010',
+  'sub-011', 'sub-012', 'sub-013'
+]);
+
 export function isUserMatch(targetIdOrEmailOrName: string | undefined | null, user: User): boolean {
   if (!targetIdOrEmailOrName || !user) return false;
-  const target = targetIdOrEmailOrName.trim().toLowerCase();
-  const userId = (user.id || '').trim().toLowerCase();
-  const userEmail = (user.email || '').trim().toLowerCase();
-  const userName = (user.name || '').trim().toLowerCase();
-  return (
-    userId === target ||
-    userEmail === target ||
-    userName === target ||
-    target.includes(userId) ||
-    (userId.length > 5 && target.includes(userId.slice(0, 8)))
-  );
+  const clean = (str: string) =>
+    str.trim().toLowerCase().replace(/^member#/i, '').replace(/^user#/i, '');
+  const target = clean(targetIdOrEmailOrName);
+  const userId = clean(user.id || '');
+  const userEmail = clean(user.email || '');
+  const userName = clean(user.name || '');
+
+  if (!target) return false;
+  if (userId && (userId === target || target === userId)) return true;
+  if (userEmail && (userEmail === target || target === userEmail)) return true;
+  if (userName && (userName === target || target === userName)) return true;
+  if (userId && (target.includes(userId) || userId.includes(target))) return true;
+  if (userEmail && (target.includes(userEmail) || userEmail.includes(target))) return true;
+  if (userName && (target.includes(userName) || userName.includes(target))) return true;
+  return false;
 }
 
 export function getUserApprovedPoints(user: User, submissions: PointSubmission[]): number {
+  if (!user || !Array.isArray(submissions)) return 0;
   return submissions
-    .filter((s) => s.status === 'approved' && isUserMatch(s.targetUserId, user))
+    .filter((s) => {
+      const isApproved = s.status === 'approved' || (s.status as any) === 'confirmed';
+      return isApproved && isUserMatch(s.targetUserId, user);
+    })
     .reduce((sum, s) => sum + (Number(s.points) || 0), 0);
 }
 
 export function calculateEffectiveUserPoints(user: User, submissions: PointSubmission[]): number {
-  const approvedPoints = getUserApprovedPoints(user, submissions);
-  const basePoints = Number(user.totalPoints) || 0;
-  return Math.max(basePoints, approvedPoints);
+  if (!user) return 0;
+
+  // 1. Direct points stored on user
+  let storedPoints = Number(user.totalPoints) || 0;
+
+  // 2. Check if explicit points override/storage exists in localStorage
+  if (typeof window !== 'undefined') {
+    const explicitPts = window.localStorage.getItem(`cloudboard_user_points_${user.id}`);
+    if (explicitPts !== null) {
+      storedPoints = Math.max(0, parseInt(explicitPts, 10) || 0);
+    }
+  }
+
+  // 3. Sum of all approved submissions for this user
+  const allApprovedPoints = getUserApprovedPoints(user, submissions);
+
+  // Effective score is at least storedPoints or allApprovedPoints
+  return Math.max(storedPoints, allApprovedPoints);
 }
 
 export function enrichUsersWithPoints(users: User[], submissions: PointSubmission[]): User[] {
+  if (!Array.isArray(users)) return [];
   return users.map((u) => ({
     ...u,
     totalPoints: calculateEffectiveUserPoints(u, submissions),

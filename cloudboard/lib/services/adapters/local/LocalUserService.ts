@@ -13,24 +13,101 @@ function sanitizeUser(u: any): User {
   };
 }
 
-function getStoredUsers(): User[] {
-  if (typeof window === 'undefined') return INITIAL_USERS;
+export function migrateUsers(rawUsers: any[]): User[] {
+  if (!Array.isArray(rawUsers) || rawUsers.length === 0) return INITIAL_USERS;
+
+  let hasThidas = false;
+  const migrated = rawUsers.map((u: any) => {
+    const sanitized = sanitizeUser(u);
+    // Ensure user-08 is Thidas (Dept Head of Engineering)
+    if (
+      sanitized.id === 'user-08' ||
+      (sanitized.email && sanitized.email.toLowerCase().includes('thidas')) ||
+      (sanitized.name && sanitized.name.toLowerCase().includes('thidas')) ||
+      (sanitized.name && sanitized.name.toLowerCase().includes('nikhil'))
+    ) {
+      hasThidas = true;
+      return {
+        ...sanitized,
+        id: 'user-08',
+        name: 'Thidas',
+        email: 'thidas@cloudboard.internal',
+        avatarInitials: 'TH',
+        role: 'dept-head' as UserRole,
+        deptId: 'engineering' as DeptId,
+        avatarColor: '#4338ca',
+      };
+    }
+
+    // Ensure user-20 (Arjun Krishnamurthy / Leader / "me") is removed from Engineering roster
+    if (
+      sanitized.id === 'user-20' ||
+      (sanitized.email && sanitized.email.toLowerCase().includes('arjun')) ||
+      (sanitized.name && sanitized.name.toLowerCase().includes('arjun'))
+    ) {
+      return {
+        ...sanitized,
+        deptId: '' as any,
+      };
+    }
+
+    // Any leader should have org-wide authority, not assigned to Engineering department
+    if (sanitized.role === 'leader' && sanitized.deptId === 'engineering') {
+      return {
+        ...sanitized,
+        deptId: '' as any,
+      };
+    }
+
+    // Check if points override was recorded
+    if (typeof window !== 'undefined') {
+      const explicitPts = window.localStorage.getItem(`cloudboard_user_points_${sanitized.id}`);
+      if (explicitPts !== null) {
+        sanitized.totalPoints = Math.max(0, parseInt(explicitPts, 10) || 0);
+      }
+    }
+
+    return sanitized;
+  });
+
+  if (!hasThidas) {
+    migrated.push({
+      id: 'user-08',
+      name: 'Thidas',
+      email: 'thidas@cloudboard.internal',
+      avatarInitials: 'TH',
+      role: 'dept-head',
+      deptId: 'engineering',
+      joinDate: '2024-03-20',
+      totalPoints: 58,
+      avatarColor: '#4338ca',
+    });
+  }
+
+  return migrated;
+}
+
+export function getStoredUsers(): User[] {
+  if (typeof window === 'undefined') return migrateUsers(INITIAL_USERS);
   try {
     const raw = window.localStorage.getItem(STORE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        return parsed.map(sanitizeUser);
+        const migrated = migrateUsers(parsed);
+        window.localStorage.setItem(STORE_KEY, JSON.stringify(migrated));
+        return migrated;
       }
     }
-    window.localStorage.setItem(STORE_KEY, JSON.stringify(INITIAL_USERS));
-    return INITIAL_USERS;
+    const initialMigrated = migrateUsers(INITIAL_USERS);
+    window.localStorage.setItem(STORE_KEY, JSON.stringify(initialMigrated));
+    return initialMigrated;
   } catch {
-    return INITIAL_USERS;
+    return migrateUsers(INITIAL_USERS);
   }
 }
 
-function saveUsers(users: User[]): void {
+export function saveUsers(users: User[]): void {
   if (typeof window === 'undefined') return;
   try {
     window.localStorage.setItem(STORE_KEY, JSON.stringify(users));
@@ -82,6 +159,9 @@ export class LocalUserService implements IUserService {
     };
     users[idx] = updatedUser;
     saveUsers(users);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(`cloudboard_user_points_${targetUserId}`, String(Math.max(0, newPoints)));
+    }
     return updatedUser;
   }
 

@@ -179,7 +179,12 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
                       undefined
                     : undefined) ||
                   undefined;
-                setCurrentUserState({ ...matchedUser, avatarUrl: storedAvatar });
+                const safeMatched: User = {
+                  ...matchedUser,
+                  deptId: matchedUser.role === 'leader' ? ('' as any) : matchedUser.deptId,
+                  avatarUrl: storedAvatar,
+                };
+                setCurrentUserState(safeMatched);
               } else {
                 const storedAvatar =
                   (typeof window !== 'undefined'
@@ -187,14 +192,15 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
                       window.localStorage.getItem(`cloudboard_avatar_by_email_${sessionUser.email.toLowerCase()}`) ||
                       undefined
                     : undefined) || undefined;
+                const userRole = sanitizeUserRole(sessionUser.dept || (sessionUser as any).role);
                 setCurrentUserState({
                   id: sessionUser.sub || 'cognito-user',
                   name: sessionUser.name || sessionUser.email.split('@')[0],
                   email: sessionUser.email,
                   avatarInitials: (sessionUser.name || sessionUser.email).slice(0, 2).toUpperCase(),
                   avatarUrl: storedAvatar,
-                  role: sanitizeUserRole(sessionUser.dept),
-                  deptId: 'engineering',
+                  role: userRole,
+                  deptId: userRole === 'leader' ? ('' as any) : 'marketing-design',
                   joinDate: new Date().toISOString().split('T')[0],
                   totalPoints: 0,
                   avatarColor: '#16a34a',
@@ -213,7 +219,12 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
                   undefined
                 : undefined) ||
               undefined;
-            setCurrentUserState({ ...user, avatarUrl: storedAvatar });
+            const safeUser: User = {
+              ...user,
+              deptId: user.role === 'leader' ? ('' as any) : user.deptId,
+              avatarUrl: storedAvatar,
+            };
+            setCurrentUserState(safeUser);
           }
         }
       } catch (err: unknown) {
@@ -232,7 +243,11 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setCurrentUser = useCallback((user: User) => {
-    setCurrentUserState(user);
+    const safeUser: User = {
+      ...user,
+      deptId: user.role === 'leader' ? ('' as any) : user.deptId,
+    };
+    setCurrentUserState(safeUser);
   }, []);
 
   const signIn = useCallback(
@@ -251,15 +266,19 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
           u.id === result.user.sub
       );
       if (matched) {
-        setCurrentUserState(matched);
+        setCurrentUserState({
+          ...matched,
+          deptId: matched.role === 'leader' ? ('' as any) : matched.deptId,
+        });
       } else {
+        const userRole = sanitizeUserRole(result.user.dept || (result.user as any).role);
         setCurrentUserState({
           id: result.user.sub || `user-${Date.now()}`,
           name: result.user.name || email.split('@')[0],
           email: result.user.email,
           avatarInitials: email.slice(0, 2).toUpperCase(),
-          role: sanitizeUserRole(result.user.dept),
-          deptId: 'engineering',
+          role: userRole,
+          deptId: userRole === 'leader' ? ('' as any) : 'marketing-design',
           joinDate: new Date().toISOString().split('T')[0],
           totalPoints: 0,
           avatarColor: '#16a34a',
@@ -275,7 +294,12 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     setCognitoUser(null);
     setIsAuthenticated(false);
     const defaultFallback = allUsers.find((u) => u.role === 'leader') ?? allUsers[0] ?? DEFAULT_ANONYMOUS_USER;
-    if (defaultFallback) setCurrentUserState(defaultFallback);
+    if (defaultFallback) {
+      setCurrentUserState({
+        ...defaultFallback,
+        deptId: defaultFallback.role === 'leader' ? ('' as any) : defaultFallback.deptId,
+      });
+    }
   }, [allUsers]);
 
   const forgotPassword = useCallback(async (email: string) => {

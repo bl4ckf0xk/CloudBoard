@@ -137,13 +137,19 @@ export class LocalSubmissionService implements ISubmissionService {
               (u: any) =>
                 (u.id && u.id.toLowerCase() === targetLower) ||
                 (u.email && u.email.toLowerCase() === targetLower) ||
-                (u.name && u.name.toLowerCase() === targetLower)
+                (u.name && u.name.toLowerCase() === targetLower) ||
+                (u.id && targetLower.includes(u.id.toLowerCase()))
             );
             if (uIdx !== -1) {
               parsedUsers[uIdx].totalPoints = (parsedUsers[uIdx].totalPoints || 0) + pointsAwarded;
               window.localStorage.setItem('cloudboard_members', JSON.stringify(parsedUsers));
+              window.localStorage.setItem(`cloudboard_user_points_${parsedUsers[uIdx].id}`, String(parsedUsers[uIdx].totalPoints));
             }
           }
+        }
+        if (targetUserId) {
+          const currentPts = parseInt(window.localStorage.getItem(`cloudboard_user_points_${targetUserId}`) || '0', 10);
+          window.localStorage.setItem(`cloudboard_user_points_${targetUserId}`, String(currentPts + pointsAwarded));
         }
         window.dispatchEvent(new CustomEvent('contribution-submitted', { detail: updated }));
       } catch (err) {

@@ -73,7 +73,7 @@ export default function ProfileCard({ user }: ProfileCardProps) {
   const confirmedPoints = useMemo(
     () =>
       submissions
-        .filter((s) => isUserMatch(s.targetUserId, activeUser) && s.status === 'approved')
+        .filter((s) => isUserMatch(s.targetUserId, activeUser) && (s.status === 'approved' || (s.status as any) === 'confirmed'))
         .reduce((acc, s) => acc + (Number(s.points) || 0), 0),
     [submissions, activeUser]
   );

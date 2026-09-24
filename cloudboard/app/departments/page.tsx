@@ -163,13 +163,18 @@ function DepartmentsContent() {
     const baseUsers = members.length > 0 ? members : INITIAL_USERS;
     const usersToProcess = enrichUsersWithPoints(baseUsers, submissions);
 
+    const isApprovedSub = (s: PointSubmission) => s.status === 'approved' || (s.status as any) === 'confirmed';
+
     const rawList = deptsToProcess.map((dept) => {
       const deptMembers = usersToProcess.filter((m) => m.deptId === dept.id);
       const totalPoints = deptMembers.reduce((sum, m) => sum + (m.totalPoints || 0), 0);
-      const head = deptMembers.find((m) => m.role === 'dept-head') || deptMembers.find((m) => m.role === 'leader');
+      const head =
+        deptMembers.find((m) => m.role === 'dept-head') ||
+        usersToProcess.find((u) => u.id === dept.headUserId) ||
+        deptMembers.find((m) => m.role === 'leader');
 
       const approvedSubs = submissions.filter(
-        (s) => (s.home_dept === dept.id || s.target_dept === dept.id) && s.status === 'approved'
+        (s) => (s.home_dept === dept.id || s.target_dept === dept.id) && isApprovedSub(s)
       );
       const pendingSubs = submissions.filter(
         (s) => (s.home_dept === dept.id || s.target_dept === dept.id) && s.status === 'pending'
@@ -214,7 +219,10 @@ function DepartmentsContent() {
         dept: activeDept,
         members: members.filter((m) => m.deptId === activeDept.id),
         points: 0,
-        head: members.find((m) => m.deptId === activeDept.id && (m.role === 'dept-head' || m.role === 'leader')),
+        head:
+          members.find((m) => m.deptId === activeDept.id && m.role === 'dept-head') ||
+          members.find((u) => u.id === activeDept.headUserId) ||
+          members.find((m) => m.deptId === activeDept.id && m.role === 'leader'),
         approvedCount: 0,
         pendingCount: 0,
         crossCount: 0,
