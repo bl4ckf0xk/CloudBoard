@@ -65,24 +65,42 @@ function TimelineEvent({
         >
           <div style={{ flex: 1, minWidth: 0 }}>
             {/* Direction label */}
-            <p
-              style={{
-                fontSize: '0.68rem',
-                color: isIncoming ? 'var(--accent-green)' : 'var(--accent-indigo)',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '0.08em',
-                marginBottom: 3,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-              }}
-            >
-              {isIncoming ? 'Received from' : 'Submitted to'}
-              <span style={{ fontWeight: 500, textTransform: 'none', letterSpacing: 0, color: 'var(--text-primary)' }}>
-                {isIncoming ? submitter?.name.split(' ')[0] ?? '—' : target?.name.split(' ')[0] ?? '—'}
-              </span>
-            </p>
+            {(() => {
+              const approverUser = sub.approvedBy ? userMap.get(sub.approvedBy) : null;
+              const approverName =
+                sub.approvedByName ||
+                approverUser?.name?.split(' ')[0] ||
+                (targetDept ? `${targetDept.shortName} Head` : 'Leadership');
+              const isSelfSubmitted =
+                !sub.submitterId ||
+                sub.submitterId === sub.targetUserId ||
+                (submitter && target && submitter.id === target.id);
+
+              return (
+                <p
+                  style={{
+                    fontSize: '0.68rem',
+                    color: isIncoming ? 'var(--accent-green)' : 'var(--accent-indigo)',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.08em',
+                    marginBottom: 3,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                >
+                  {isIncoming
+                    ? (isSelfSubmitted ? 'Approved by' : 'Received from')
+                    : 'Submitted for'}
+                  <span style={{ fontWeight: 600, textTransform: 'none', letterSpacing: 0, color: 'var(--text-primary)' }}>
+                    {isIncoming
+                      ? (isSelfSubmitted ? approverName : submitter?.name.split(' ')[0] ?? '—')
+                      : target?.name.split(' ')[0] ?? '—'}
+                  </span>
+                </p>
+              );
+            })()}
             {/* Reason */}
             <p
               style={{
@@ -218,8 +236,12 @@ export default function PointsTimeline({ user, limit }: PointsTimelineProps) {
       }
     }
     loadData();
+
+    const handleReload = () => loadData();
+    window.addEventListener('contribution-submitted', handleReload);
     return () => {
       isMounted = false;
+      window.removeEventListener('contribution-submitted', handleReload);
     };
   }, [user.id, limit]);
 
@@ -245,9 +267,16 @@ export default function PointsTimeline({ user, limit }: PointsTimelineProps) {
         }}
       >
         <div style={{ fontSize: '2rem', marginBottom: 8 }}>📜</div>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: 12 }}>
           No recognition submissions yet
         </p>
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent('open-log-modal'))}
+          className="cb-btn-primary"
+          style={{ fontSize: '0.78rem', padding: '6px 14px' }}
+        >
+          + Award First Points
+        </button>
       </div>
     );
   }

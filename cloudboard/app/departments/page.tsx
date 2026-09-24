@@ -1,55 +1,89 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { Department, User, DeptId } from '@/lib/services/types';
-import { departmentService, userService } from '@/lib/services';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { Department, User, DeptId, PointSubmission } from '@/lib/services/types';
+import { departmentService, userService, submissionService } from '@/lib/services';
 import { getBadgeColors, getRoleMeta } from '@/lib/utils';
 import { logger } from '@/lib/logger';
-import { Users, Sparkles, ChevronDown, ChevronUp, UserCheck } from 'lucide-react';
+import { Users, Sparkles, ChevronDown, ChevronUp, UserCheck, PlusCircle, Award, ArrowUpRight } from 'lucide-react';
 
 export default function DepartmentsPage() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [members, setMembers] = useState<User[]>([]);
+  const [submissions, setSubmissions] = useState<PointSubmission[]>([]);
   const [expandedDept, setExpandedDept] = useState<DeptId | null>(null);
 
-  useEffect(() => {
-    let isMounted = true;
-    async function loadData() {
-      try {
-        const [depts, allUsers] = await Promise.all([
-          departmentService.getAllDepartments(),
-          userService.getAllUsers(),
-        ]);
-        if (isMounted) {
-          setDepartments(depts);
-          setMembers(allUsers);
-        }
-      } catch (err: unknown) {
-        logger.error('[DepartmentsPage] Failed to load data:', err);
-      }
+  const loadData = useCallback(async () => {
+    try {
+      const [depts, allUsers, allSubs] = await Promise.all([
+        departmentService.getAllDepartments(),
+        userService.getAllUsers(),
+        submissionService.getSubmissions(),
+      ]);
+      setDepartments(depts);
+      setMembers(allUsers);
+      setSubmissions(allSubs);
+    } catch (err: unknown) {
+      logger.error('[DepartmentsPage] Failed to load data:', err);
     }
-    loadData();
-    return () => {
-      isMounted = false;
-    };
   }, []);
 
+  useEffect(() => {
+    loadData();
+
+    // Check URL search param or hash for auto-expanded department
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const targetDept = params.get('dept') || window.location.hash.replace('#', '');
+      if (targetDept) {
+        setExpandedDept(targetDept as DeptId);
+        setTimeout(() => {
+          const el = document.getElementById(targetDept);
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 150);
+      }
+    }
+  }, [loadData]);
+
+  // Listen for real-time contribution updates
+  useEffect(() => {
+    const handleReload = () => loadData();
+    window.addEventListener('contribution-submitted', handleReload);
+    return () => window.removeEventListener('contribution-submitted', handleReload);
+  }, [loadData]);
+
   const deptStats = useMemo(() => {
-    const stats: Record<string, { members: User[]; points: number; head: User | undefined }> = {};
+    const stats: Record<
+      string,
+      {
+        members: User[];
+        points: number;
+        head: User | undefined;
+        approvedCount: number;
+        crossCount: number;
+      }
+    > = {};
 
     for (const dept of departments) {
       const deptMembers = members.filter((m) => m.deptId === dept.id);
       const totalPoints = deptMembers.reduce((sum, m) => sum + m.totalPoints, 0);
       const head = deptMembers.find((m) => m.role === 'dept-head' || m.role === 'leader');
 
+      const deptSubs = submissions.filter(
+        (s) => (s.home_dept === dept.id || s.target_dept === dept.id) && s.status === 'approved'
+      );
+      const crossSubs = deptSubs.filter((s) => s.cross_dept);
+
       stats[dept.id] = {
         members: deptMembers.sort((a, b) => b.totalPoints - a.totalPoints),
         points: totalPoints,
         head,
+        approvedCount: deptSubs.length,
+        crossCount: crossSubs.length,
       };
     }
     return stats;
-  }, [departments, members]);
+  }, [departments, members, submissions]);
 
   return (
     <div
@@ -350,6 +384,60 @@ export default function DepartmentsPage() {
                   }}
                 >
                   <div style={{ padding: '16px 24px 22px' }}>
+                    {/* Department Overview Action & Stats Bar */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: 10,
+                        marginBottom: 16,
+                        paddingBottom: 14,
+                        borderBottom: '1px solid var(--border-subtle)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span
+                          style={{
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            padding: '3px 10px',
+                            borderRadius: 6,
+                            background: 'rgba(245, 158, 11, 0.12)',
+                            color: 'var(--accent-amber)',
+                            border: '1px solid rgba(245, 158, 11, 0.25)',
+                          }}
+                        >
+                          {stat.points.toLocaleString()} Points
+                        </span>
+                        {stat.crossCount > 0 && (
+                          <span
+                            style={{
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              padding: '3px 10px',
+                              borderRadius: 6,
+                              background: 'rgba(16, 185, 129, 0.12)',
+                              color: 'var(--accent-green)',
+                              border: '1px solid rgba(16, 185, 129, 0.25)',
+                            }}
+                          >
+                            {stat.crossCount} Cross-Team
+                          </span>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={() => window.dispatchEvent(new CustomEvent('open-log-modal'))}
+                        className="cb-btn-primary"
+                        style={{ padding: '6px 14px', fontSize: '0.76rem', gap: 6 }}
+                      >
+                        <PlusCircle size={14} />
+                        <span>Award Points</span>
+                      </button>
+                    </div>
+
                     <h4
                       style={{
                         fontSize: '0.72rem',

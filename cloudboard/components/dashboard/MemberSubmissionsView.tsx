@@ -64,7 +64,7 @@ export default function MemberSubmissionsView({ userId }: MemberSubmissionsViewP
           <EmptyState
             icon="🏆"
             title="No recognition received yet"
-            description="When team members recognise contributions, points and notes will appear here."
+            description="When team members recognise achievements, points and notes will appear here."
           />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -107,7 +107,7 @@ export default function MemberSubmissionsView({ userId }: MemberSubmissionsViewP
           <EmptyState
             icon="🤝"
             title="No recognition submitted yet"
-            description="Use the Log Contribution button to recognize teammates and celebrate their milestones."
+            description="Use the Award Points button to recognize teammates and celebrate their milestones."
           />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

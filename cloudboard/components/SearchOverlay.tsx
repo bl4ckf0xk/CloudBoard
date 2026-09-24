@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { userService, submissionService, departmentService } from '@/lib/services';
 import { User, PointSubmission, Department } from '@/lib/services/types';
@@ -26,21 +27,26 @@ const QUICK_LINKS = [
   { href: '/', title: 'Home & Overview', desc: 'Org performance & departmental rankings', icon: Navigation },
   { href: '/dashboard', title: 'My Dashboard', desc: 'Personal recognitions, timeline & points breakdown', icon: Award },
   { href: '/submissions', title: 'Submissions Feed', desc: 'Live recognitions, peer rewards & feed', icon: Award },
-  { href: '/leaderboard', title: 'Global Leaderboard', desc: 'Contributor standings & rank podiums', icon: Users },
+  { href: '/leaderboard', title: 'Global Leaderboard', desc: 'Member standings & rank podiums', icon: Users },
   { href: '/departments', title: 'Department Directory', desc: 'Teams, rosters & committee member details', icon: Building2 },
   { href: '/attendance', title: 'Attendance Management', desc: 'Session logs & attendance rate verification', icon: Navigation },
-  { href: '/dept-head', title: 'Dept Head Review', desc: 'Review & approve pending contributions', icon: Building2 },
+  { href: '/dept-head', title: 'Dept Head Review', desc: 'Review & approve pending point submissions', icon: Building2 },
   { href: '/leader', title: 'Leader Oversight', desc: 'Executive governance, audit logs & points override', icon: Users },
 ];
 
 export default function SearchOverlay({ isOpen, onClose, initialQuery = '' }: SearchOverlayProps) {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
   const [query, setQuery] = useState(initialQuery);
   const [users, setUsers] = useState<User[]>([]);
   const [submissions, setSubmissions] = useState<PointSubmission[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -60,13 +66,9 @@ export default function SearchOverlay({ isOpen, onClose, initialQuery = '' }: Se
     }
   }, [isOpen, initialQuery]);
 
-  // Global Cmd+K trigger
+  // Global escape & close listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        if (isOpen) onClose();
-      }
       if (e.key === 'Escape' && isOpen) {
         onClose();
       }
@@ -166,10 +168,28 @@ export default function SearchOverlay({ isOpen, onClose, initialQuery = '' }: Se
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
-  return (
-    <div className="modal-overlay" style={{ alignItems: 'flex-start', paddingTop: '10vh' }}>
+  return createPortal(
+    <div
+      className="modal-overlay animate-fade-in"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        width: '100vw',
+        height: '100vh',
+        zIndex: 99999,
+        display: 'flex',
+        alignItems: 'flex-start',
+        justifyContent: 'center',
+        paddingTop: '10vh',
+        paddingLeft: '16px',
+        paddingRight: '16px',
+        background: 'rgba(0, 0, 0, 0.65)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
+      }}
+    >
       <div onClick={onClose} style={{ position: 'absolute', inset: 0 }} />
 
       <div
@@ -489,6 +509,7 @@ export default function SearchOverlay({ isOpen, onClose, initialQuery = '' }: Se
           <span>CloudBoard Global Search</span>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

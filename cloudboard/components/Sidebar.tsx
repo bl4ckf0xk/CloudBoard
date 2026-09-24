@@ -217,77 +217,83 @@ export default function Sidebar({
             );
           })}
 
-          {/* TEAMS Section */}
-          <div
-            style={{
-              marginTop: 20,
-              paddingTop: 16,
-              borderTop: '1px solid var(--border-subtle)',
-            }}
-          >
-            {!collapsed ? (
-              <div
-                style={{
-                  fontSize: '0.68rem',
-                  fontWeight: 800,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  color: 'var(--text-muted)',
-                  padding: '4px 14px 10px',
-                }}
-              >
-                Teams
-              </div>
-            ) : (
-              <div
-                style={{
-                  height: 1,
-                  background: 'transparent',
-                  margin: '4px 0',
-                }}
-              />
-            )}
+          {/* TEAMS Section — Leader Only */}
+          {ROLE_RANK[currentUser.role] >= ROLE_RANK['leader'] && (
+            <div
+              style={{
+                marginTop: 20,
+                paddingTop: 16,
+                borderTop: '1px solid var(--border-subtle)',
+              }}
+            >
+              {!collapsed ? (
+                <div
+                  style={{
+                    fontSize: '0.68rem',
+                    fontWeight: 800,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    color: 'var(--text-muted)',
+                    padding: '4px 14px 10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>Teams</span>
+                  <span style={{ fontSize: '0.6rem', color: 'var(--accent-amber)', fontWeight: 700 }}>LEADER</span>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    height: 1,
+                    background: 'transparent',
+                    margin: '4px 0',
+                  }}
+                />
+              )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {departments.slice(0, 5).map((dept) => {
-                const color = DEPT_COLORS[dept.id] || '#6366f1';
-                return (
-                  <Link
-                    key={dept.id}
-                    href={`/departments#${dept.id}`}
-                    onClick={onCloseMobile}
-                    data-tooltip={collapsed ? dept.name : undefined}
-                    className="sidebar-link"
-                    style={{
-                      justifyContent: collapsed ? 'center' : 'flex-start',
-                      padding: collapsed ? '8px 0' : '8px 14px',
-                      fontSize: '0.82rem',
-                    }}
-                  >
-                    <span
-                      className="sidebar-team-dot"
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {departments.slice(0, 5).map((dept) => {
+                  const color = DEPT_COLORS[dept.id] || '#6366f1';
+                  return (
+                    <Link
+                      key={dept.id}
+                      href={`/departments?dept=${dept.id}`}
+                      onClick={onCloseMobile}
+                      data-tooltip={collapsed ? dept.name : undefined}
+                      className="sidebar-link"
                       style={{
-                        background: color,
-                        boxShadow: `0 0 8px ${color}50`,
+                        justifyContent: collapsed ? 'center' : 'flex-start',
+                        padding: collapsed ? '8px 0' : '8px 14px',
+                        fontSize: '0.82rem',
                       }}
-                    />
-                    {!collapsed && (
+                    >
                       <span
+                        className="sidebar-team-dot"
                         style={{
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          color: 'var(--text-secondary)',
+                          background: color,
+                          boxShadow: `0 0 8px ${color}50`,
                         }}
-                      >
-                        {dept.name}
-                      </span>
-                    )}
-                  </Link>
-                );
-              })}
+                      />
+                      {!collapsed && (
+                        <span
+                          style={{
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            color: 'var(--text-secondary)',
+                          }}
+                        >
+                          {dept.name}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* User Mini Profile & Collapse Toggle at Bottom */}

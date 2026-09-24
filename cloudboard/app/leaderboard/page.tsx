@@ -1,14 +1,28 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { User, Department, UserRole } from '@/lib/services/types';
-import { userService, departmentService } from '@/lib/services';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { User, Department, UserRole, PointSubmission } from '@/lib/services/types';
+import { userService, departmentService, submissionService } from '@/lib/services';
 import { ROLE_ORDER, getBadgeColors, getRoleMeta } from '@/lib/utils';
 import { logger } from '@/lib/logger';
 import EmptyState from '@/components/ui/EmptyState';
-import { Trophy, Medal, Crown } from 'lucide-react';
+import { Trophy, Medal, Crown, Sparkles, Award } from 'lucide-react';
 
-function Podium({ top3, deptMap }: { top3: User[]; deptMap: Map<string, Department> }) {
+interface UserContribStats {
+  count: number;
+  crossCount: number;
+  points: number;
+}
+
+function Podium({
+  top3,
+  deptMap,
+  statsMap,
+}: {
+  top3: User[];
+  deptMap: Map<string, Department>;
+  statsMap: Map<string, UserContribStats>;
+}) {
   if (top3.length < 3) return null;
 
   const displayOrder = [top3[1], top3[0], top3[2]];
@@ -34,6 +48,8 @@ function Podium({ top3, deptMap }: { top3: User[]; deptMap: Map<string, Departme
         const medal = medals[idx];
         const h = heights[idx];
         const dept = deptMap.get(user.deptId);
+        const stats = statsMap.get(user.id);
+        const pts = stats && stats.points > 0 ? stats.points : user.totalPoints;
 
         return (
           <div
@@ -112,7 +128,7 @@ function Podium({ top3, deptMap }: { top3: User[]; deptMap: Map<string, Departme
               </div>
             </div>
 
-            {/* User Meta */}
+              {/* User Meta */}
             <div style={{ textAlign: 'center', marginBottom: 12 }}>
               <p
                 style={{
@@ -139,7 +155,7 @@ function Podium({ top3, deptMap }: { top3: User[]; deptMap: Map<string, Departme
                   fontVariantNumeric: 'tabular-nums',
                 }}
               >
-                {user.totalPoints.toLocaleString()} <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>pts</span>
+                {pts.toLocaleString()} <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>pts</span>
               </p>
             </div>
 
@@ -180,43 +196,68 @@ function Podium({ top3, deptMap }: { top3: User[]; deptMap: Map<string, Departme
 
 export default function LeaderboardPage() {
   const [members, setMembers] = useState<User[]>([]);
+  const [submissions, setSubmissions] = useState<PointSubmission[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
 
-  useEffect(() => {
-    let isMounted = true;
-    async function loadData() {
-      try {
-        const [allUsers, depts] = await Promise.all([
-          userService.getAllUsers(),
-          departmentService.getAllDepartments(),
-        ]);
-        if (isMounted) {
-          setMembers(allUsers);
-          setDepartments(depts);
-        }
-      } catch (err: unknown) {
-        logger.error('[LeaderboardPage] Failed to load data:', err);
-      }
+  const loadData = useCallback(async () => {
+    try {
+      const [allUsers, depts, subs] = await Promise.all([
+        userService.getAllUsers(),
+        departmentService.getAllDepartments(),
+        submissionService.getSubmissions(),
+      ]);
+      setMembers(allUsers);
+      setDepartments(depts);
+      setSubmissions(subs);
+    } catch (err: unknown) {
+      logger.error('[LeaderboardPage] Failed to load data:', err);
     }
-    loadData();
-    return () => {
-      isMounted = false;
-    };
   }, []);
 
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Real-time refresh when new recognition is approved or logged
+  useEffect(() => {
+    const handleReload = () => loadData();
+    window.addEventListener('contribution-submitted', handleReload);
+    return () => window.removeEventListener('contribution-submitted', handleReload);
+  }, [loadData]);
+
   const deptMap = useMemo(() => new Map(departments.map((d) => [d.id, d])), [departments]);
+
+  const statsMap = useMemo(() => {
+    const map = new Map<string, UserContribStats>();
+    for (const s of submissions) {
+      if (s.status !== 'approved') continue;
+      const cur = map.get(s.targetUserId) || { count: 0, crossCount: 0, points: 0 };
+      cur.count += 1;
+      if (s.cross_dept) cur.crossCount += 1;
+      cur.points += s.points;
+      map.set(s.targetUserId, cur);
+    }
+    return map;
+  }, [submissions]);
 
   const CONTRIBUTOR_ROLES = useMemo(() => ROLE_ORDER.filter((r) => r !== 'leader'), []);
 
   const rankedMembers = useMemo(() => {
-    // Contributor leaderboard excludes 'leader' role (leadership oversees, does not compete)
     let list = members.filter((m) => m.role !== 'leader');
     if (roleFilter !== 'all') {
       list = list.filter((m) => m.role === roleFilter);
     }
-    return list.sort((a, b) => b.totalPoints - a.totalPoints);
-  }, [members, roleFilter]);
+
+    return list.sort((a, b) => {
+      const aStats = statsMap.get(a.id) || { count: 0, crossCount: 0, points: 0 };
+      const bStats = statsMap.get(b.id) || { count: 0, crossCount: 0, points: 0 };
+      const aPts = aStats.points > 0 ? aStats.points : a.totalPoints;
+      const bPts = bStats.points > 0 ? bStats.points : b.totalPoints;
+
+      return bPts - aPts;
+    });
+  }, [members, roleFilter, statsMap]);
 
   const top3 = rankedMembers.slice(0, 3);
   const rest = rankedMembers.slice(3);
@@ -252,33 +293,35 @@ export default function LeaderboardPage() {
               letterSpacing: '-0.03em',
             }}
           >
-            Global Contributor Leaderboard
+            Global Leaderboard
           </h2>
           <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: 2 }}>
-            Recognising top team contributors across the entire organisation
+            Recognising top team performers and point earners across the entire organisation
           </p>
         </div>
 
-        {/* Role Filters Segmented Control - Leader role removed per requirements */}
-        <div className="filter-segmented">
-          {(['all', ...CONTRIBUTOR_ROLES] as const).map((r) => {
-            const isActive = roleFilter === r;
-            return (
-              <button
-                key={r}
-                onClick={() => setRoleFilter(r as UserRole | 'all')}
-                className={`filter-segment-btn ${isActive ? 'active' : ''}`}
-                style={{ padding: '6px 14px', fontSize: '0.78rem' }}
-              >
-                {r === 'all' ? 'All Roles' : getRoleMeta(r).label}
-              </button>
-            );
-          })}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          {/* Role Filters Segmented Control */}
+          <div className="filter-segmented">
+            {(['all', ...CONTRIBUTOR_ROLES] as const).map((r) => {
+              const isActive = roleFilter === r;
+              return (
+                <button
+                  key={r}
+                  onClick={() => setRoleFilter(r as UserRole | 'all')}
+                  className={`filter-segment-btn ${isActive ? 'active' : ''}`}
+                  style={{ padding: '6px 14px', fontSize: '0.78rem' }}
+                >
+                  {r === 'all' ? 'All Roles' : getRoleMeta(r).label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
       {/* Podium */}
-      <Podium top3={top3} deptMap={deptMap} />
+      <Podium top3={top3} deptMap={deptMap} statsMap={statsMap} />
 
       {/* Ranked List */}
       <div
@@ -290,6 +333,8 @@ export default function LeaderboardPage() {
           const dept = deptMap.get(user.deptId);
           const meta = getRoleMeta(user.role);
           const bc = getBadgeColors(user.role);
+          const stats = statsMap.get(user.id);
+          const pts = stats && stats.points > 0 ? stats.points : user.totalPoints;
 
           return (
             <div
@@ -355,7 +400,7 @@ export default function LeaderboardPage() {
 
               {/* Info */}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <p style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                     {user.name}
                   </p>
@@ -374,6 +419,22 @@ export default function LeaderboardPage() {
                   >
                     {meta.label}
                   </span>
+
+                  {stats && stats.crossCount > 0 && (
+                    <span
+                      style={{
+                        fontSize: '0.65rem',
+                        padding: '2px 8px',
+                        borderRadius: 6,
+                        background: 'rgba(16, 185, 129, 0.12)',
+                        color: 'var(--accent-green)',
+                        border: '1px solid rgba(16, 185, 129, 0.25)',
+                        fontWeight: 700,
+                      }}
+                    >
+                      {stats.crossCount} cross-dept
+                    </span>
+                  )}
                 </div>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>
                   {dept?.icon} {dept?.name}
@@ -390,7 +451,7 @@ export default function LeaderboardPage() {
                     fontVariantNumeric: 'tabular-nums',
                   }}
                 >
-                  {user.totalPoints.toLocaleString()}
+                  {pts.toLocaleString()}
                 </p>
                 <p
                   style={{

@@ -46,8 +46,12 @@ export default function ProfileCard({ user }: ProfileCardProps) {
       }
     }
     loadData();
+
+    const handleReload = () => loadData();
+    window.addEventListener('contribution-submitted', handleReload);
     return () => {
       isMounted = false;
+      window.removeEventListener('contribution-submitted', handleReload);
     };
   }, [user.id, user.deptId]);
 

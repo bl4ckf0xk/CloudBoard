@@ -127,7 +127,7 @@ export default function DashboardPage() {
             Welcome back, {currentUser.name}! 👋
           </h1>
           <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-            Track your verified contributions, review milestones, and monitor committee standings.
+            Track your verified points, review milestones, and monitor committee standings.
           </p>
         </div>
 
@@ -135,12 +135,12 @@ export default function DashboardPage() {
           <button
             type="button"
             onClick={() => {
-              window.dispatchEvent(new CustomEvent('cloudboard-open-log-modal'));
+              window.dispatchEvent(new CustomEvent('open-log-modal'));
             }}
             className="cb-btn-primary"
             style={{ fontSize: '0.84rem', padding: '9px 18px' }}
           >
-            + Log Contribution
+            + Award Points
           </button>
         </div>
       </div>

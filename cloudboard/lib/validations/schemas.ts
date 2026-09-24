@@ -18,8 +18,8 @@ export function validateSubmissionInput(input: Partial<CreateSubmissionDTO>): {
     errors.push('Target department is required.');
   }
 
-  if (typeof input.points !== 'number' || input.points < 1 || input.points > 100) {
-    errors.push('Points must be a valid number between 1 and 100.');
+  if (typeof input.points !== 'number' || input.points < 1 || input.points > 5) {
+    errors.push('Points must be a valid number between 1 and 5.');
   }
 
   if (!input.category) {
@@ -28,6 +28,10 @@ export function validateSubmissionInput(input: Partial<CreateSubmissionDTO>): {
 
   if (!input.reason || input.reason.trim().length < 15) {
     errors.push('Reason must be at least 15 characters long.');
+  } else if (input.reason.trim().length > 500) {
+    errors.push('Reason must not exceed 500 characters.');
+  } else if (/<script|javascript:|data:/i.test(input.reason)) {
+    errors.push('Reason contains invalid or prohibited characters.');
   }
 
   return {

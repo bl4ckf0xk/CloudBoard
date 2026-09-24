@@ -46,7 +46,7 @@ const ROUTE_INFO: Record<string, { title: string; subtitle: string }> = {
   },
   '/dashboard': {
     title: 'My Dashboard',
-    subtitle: 'Your personal contributions, activity & points history',
+    subtitle: 'Your personal activity & points history',
   },
   '/submissions': {
     title: 'Submissions Feed',
@@ -54,7 +54,7 @@ const ROUTE_INFO: Record<string, { title: string; subtitle: string }> = {
   },
   '/leaderboard': {
     title: 'Leaderboard',
-    subtitle: 'Top individual contributors & team performance scores',
+    subtitle: 'Top individual point earners & team performance scores',
   },
   '/departments': {
     title: 'Departments',
@@ -66,7 +66,7 @@ const ROUTE_INFO: Record<string, { title: string; subtitle: string }> = {
   },
   '/dept-head': {
     title: 'Dept Head Review',
-    subtitle: 'Review & approve pending team contribution submissions',
+    subtitle: 'Review & approve pending team point submissions',
   },
   '/leader': {
     title: 'Leader Panel',
@@ -155,15 +155,16 @@ export default function TopBar({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Close dropdown on Escape
+  // Global Cmd+K / Ctrl+K search trigger
   useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        setDropdownOpen(false);
+    function handleGlobalKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSearchOpen((prev) => !prev);
       }
     }
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, []);
 
   return (
@@ -326,7 +327,7 @@ export default function TopBar({
           </span>
         </button>
 
-        {/* Primary CTA Button: + Log Contribution */}
+        {/* Primary CTA Button: + Award Points */}
         <button
           onClick={onOpenLogModal}
           className="cb-btn-primary"
@@ -337,8 +338,8 @@ export default function TopBar({
           }}
         >
           <PenLine size={16} />
-          <span className="desktop-only">+ Log Contribution</span>
-          <span className="mobile-only">+ Log</span>
+          <span className="desktop-only">+ Award Points</span>
+          <span className="mobile-only">+ Award</span>
         </button>
 
         {/* User Profile Dropdown Trigger */}

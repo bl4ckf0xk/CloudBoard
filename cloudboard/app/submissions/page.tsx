@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { PointSubmission, Department, User, DeptId } from '@/lib/services/types';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { PointSubmission, Department, User, DeptId, SubmissionStatus } from '@/lib/services/types';
 import { submissionService, departmentService, userService } from '@/lib/services';
 import { formatDate, relativeTime, CATEGORY_META } from '@/lib/utils';
 import { logger } from '@/lib/logger';
 import EmptyState from '@/components/ui/EmptyState';
-import { Filter, CheckCircle2, Sparkles } from 'lucide-react';
+import { Filter, CheckCircle2, Sparkles, PlusCircle } from 'lucide-react';
 
 export default function SubmissionsPage() {
   const [submissions, setSubmissions] = useState<PointSubmission[]>([]);
@@ -14,36 +14,42 @@ export default function SubmissionsPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [deptFilter, setDeptFilter] = useState<DeptId | 'all'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<SubmissionStatus | 'all'>('all');
+
+  const loadData = useCallback(async () => {
+    try {
+      const [subs, depts, allUsers] = await Promise.all([
+        submissionService.getSubmissions(),
+        departmentService.getAllDepartments(),
+        userService.getAllUsers(),
+      ]);
+      setSubmissions(subs);
+      setDepartments(depts);
+      setUsers(allUsers);
+    } catch (err: unknown) {
+      logger.error('[SubmissionsPage] Failed to load data:', err);
+    }
+  }, []);
 
   useEffect(() => {
-    let isMounted = true;
-    async function loadData() {
-      try {
-        const [subs, depts, allUsers] = await Promise.all([
-          submissionService.getSubmissions({ status: 'approved' }),
-          departmentService.getAllDepartments(),
-          userService.getAllUsers(),
-        ]);
-        if (isMounted) {
-          setSubmissions(subs);
-          setDepartments(depts);
-          setUsers(allUsers);
-        }
-      } catch (err: unknown) {
-        logger.error('[SubmissionsPage] Failed to load data:', err);
-      }
-    }
     loadData();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  }, [loadData]);
+
+  // Real-time reload when new contribution is submitted or approved
+  useEffect(() => {
+    const handleReload = () => loadData();
+    window.addEventListener('contribution-submitted', handleReload);
+    return () => window.removeEventListener('contribution-submitted', handleReload);
+  }, [loadData]);
 
   const userMap = useMemo(() => new Map(users.map((u) => [u.id, u])), [users]);
   const deptMap = useMemo(() => new Map(departments.map((d) => [d.id, d])), [departments]);
 
   const filteredSubmissions = useMemo(() => {
     let list = [...submissions];
+    if (statusFilter !== 'all') {
+      list = list.filter((s) => s.status === statusFilter);
+    }
     if (deptFilter !== 'all') {
       list = list.filter(
         (s) => s.target_dept === deptFilter || s.home_dept === deptFilter
@@ -55,7 +61,7 @@ export default function SubmissionsPage() {
     return list.sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
-  }, [submissions, deptFilter, categoryFilter]);
+  }, [submissions, statusFilter, deptFilter, categoryFilter]);
 
   const totalPoints = useMemo(
     () => filteredSubmissions.reduce((acc, s) => acc + s.points, 0),
@@ -96,7 +102,7 @@ export default function SubmissionsPage() {
             Public Recognition Feed
           </h2>
           <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: 2 }}>
-            A live ledger of recognized contributions and cross-department achievements
+            A live ledger of recognized achievements and point awards
           </p>
         </div>
 
@@ -106,6 +112,18 @@ export default function SubmissionsPage() {
             <Filter size={14} />
             <span>Filters:</span>
           </div>
+
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as SubmissionStatus | 'all')}
+            className="custom-select"
+            style={{ width: 'auto', padding: '7px 32px 7px 12px', fontSize: '0.82rem' }}
+          >
+            <option value="all">All Statuses</option>
+            <option value="approved">Approved</option>
+            <option value="pending">Pending</option>
+            <option value="rejected">Rejected</option>
+          </select>
 
           <select
             value={deptFilter}
@@ -138,12 +156,13 @@ export default function SubmissionsPage() {
           <button
             type="button"
             onClick={() => {
-              window.dispatchEvent(new CustomEvent('cloudboard-open-log-modal'));
+              window.dispatchEvent(new CustomEvent('open-log-modal'));
             }}
             className="cb-btn-primary"
-            style={{ fontSize: '0.8rem', padding: '7px 14px' }}
+            style={{ fontSize: '0.8rem', padding: '7px 14px', gap: 6 }}
           >
-            + Log
+            <PlusCircle size={14} />
+            <span>Award Points</span>
           </button>
         </div>
       </div>
@@ -165,7 +184,7 @@ export default function SubmissionsPage() {
           }}
         >
           <CheckCircle2 size={16} />
-          <span>{filteredSubmissions.length} approved recognitions</span>
+          <span>{filteredSubmissions.length} entries</span>
         </div>
 
         <div
@@ -206,6 +225,26 @@ export default function SubmissionsPage() {
               bg: 'var(--accent-indigo-subtle)',
               border: 'rgba(99, 102, 241, 0.3)',
             };
+
+            let approverUser = sub.approvedBy ? userMap.get(sub.approvedBy) : null;
+            if (!approverUser && targetDept?.headUserId) {
+              approverUser = userMap.get(targetDept.headUserId);
+            }
+            const approverName =
+              sub.approvedByName ||
+              approverUser?.name ||
+              (targetDept ? `${targetDept.name} Head` : 'Leadership');
+
+            const isSelfSubmitted =
+              !sub.submitterId ||
+              sub.submitterId === sub.targetUserId ||
+              (submitter && recipient && submitter.id === recipient.id);
+
+            const actorName = isSelfSubmitted
+              ? approverName
+              : (submitter?.name ?? approverName);
+
+            const targetName = recipient?.name || submitter?.name || 'Member';
 
             const tierClass =
               sub.points === 1 ? 'tier-1' :
@@ -255,12 +294,17 @@ export default function SubmissionsPage() {
                     }}
                   >
                     <strong style={{ color: 'var(--text-primary)', fontWeight: 700 }}>
-                      {submitter?.name ?? '—'}
+                      {actorName}
                     </strong>{' '}
                     recognized{' '}
                     <strong style={{ color: 'var(--text-primary)', fontWeight: 700 }}>
-                      {recipient?.name ?? '—'}
+                      {targetName}
                     </strong>
+                    {!isSelfSubmitted && submitter && approverUser && (
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: 6 }}>
+                        (via {submitter.name})
+                      </span>
+                    )}
                     {sub.cross_dept && (
                       <span
                         style={{

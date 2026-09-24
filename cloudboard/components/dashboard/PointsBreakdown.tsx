@@ -193,8 +193,12 @@ export default function PointsBreakdown({ user }: PointsBreakdownProps) {
       }
     }
     loadData();
+
+    const handleReload = () => loadData();
+    window.addEventListener('contribution-submitted', handleReload);
     return () => {
       isMounted = false;
+      window.removeEventListener('contribution-submitted', handleReload);
     };
   }, [user.id, user.deptId]);
 
@@ -252,7 +256,7 @@ export default function PointsBreakdown({ user }: PointsBreakdownProps) {
           Points Breakdown
         </h3>
         <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-          Home dept vs. cross-department contribution
+          Home dept vs. cross-department points
         </p>
       </div>
 

@@ -225,8 +225,12 @@ export default function CoreTeamLeaderboard({ currentUser }: CoreTeamLeaderboard
       }
     }
     loadData();
+
+    const handleReload = () => loadData();
+    window.addEventListener('contribution-submitted', handleReload);
     return () => {
       isMounted = false;
+      window.removeEventListener('contribution-submitted', handleReload);
     };
   }, []);
 
@@ -238,12 +242,16 @@ export default function CoreTeamLeaderboard({ currentUser }: CoreTeamLeaderboard
 
   const leaderboardData = useMemo(() => {
     return eligibleUsers
-      .map((u) => ({
-        user: u,
-        approvedPts: getApprovedPoints(u.id, submissions),
-        crossPts: getCrossDeptPoints(u.id, submissions),
-        givenCount: getSubmissionsGiven(u.id, submissions),
-      }))
+      .map((u) => {
+        const subPts = getApprovedPoints(u.id, submissions);
+        const pts = subPts > 0 ? subPts : (u.totalPoints || 0);
+        return {
+          user: u,
+          approvedPts: pts,
+          crossPts: getCrossDeptPoints(u.id, submissions),
+          givenCount: getSubmissionsGiven(u.id, submissions),
+        };
+      })
       .sort((a, b) => b.approvedPts - a.approvedPts);
   }, [eligibleUsers, submissions]);
 

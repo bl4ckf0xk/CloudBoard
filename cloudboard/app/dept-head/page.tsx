@@ -741,7 +741,7 @@ export default function DeptHeadPanelPage() {
             {currentDept?.name ?? 'Department'} — Approval Queue
           </h2>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 4 }}>
-            {currentUser.name} · Review and action pending contribution submissions
+            {currentUser.name} · Review and action pending point submissions
           </p>
         </div>
 
@@ -794,7 +794,7 @@ export default function DeptHeadPanelPage() {
       >
         <QueueSection
           title="Home Dept Submissions"
-          subtitle={`Contributions logged by members of ${currentDept?.name ?? 'your department'}`}
+          subtitle={`Submissions logged for members of ${currentDept?.name ?? 'your department'}`}
           accentColor="#10b981"
           queue={queues.homeDeptQueue}
           isCrossIncoming={false}

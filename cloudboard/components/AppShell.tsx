@@ -60,7 +60,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const handleOpenModal = () => setLogModalOpen(true);
     window.addEventListener('open-log-modal', handleOpenModal);
-    return () => window.removeEventListener('open-log-modal', handleOpenModal);
+    window.addEventListener('cloudboard-open-log-modal', handleOpenModal);
+    return () => {
+      window.removeEventListener('open-log-modal', handleOpenModal);
+      window.removeEventListener('cloudboard-open-log-modal', handleOpenModal);
+    };
   }, []);
 
   return (

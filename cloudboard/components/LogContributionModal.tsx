@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useId, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useRole } from '@/lib/roleContext';
 import {
   DeptId,
@@ -81,11 +82,11 @@ const CONTRIBUTION_TEMPLATES: ContributionTemplate[] = [
 ];
 
 const POINT_COLORS: Record<number, { color: string; bg: string; label: string }> = {
-  1: { color: '#10b981', bg: 'rgba(16, 185, 129, 0.12)', label: 'Basic' },
-  2: { color: '#16a34a', bg: 'rgba(22, 163, 74, 0.12)', label: 'Good' },
-  3: { color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.12)', label: 'Great' },
-  4: { color: '#f97316', bg: 'rgba(249, 115, 22, 0.12)', label: 'Excellent' },
-  5: { color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.15)', label: 'Outstanding' },
+  1: { color: '#10b981', bg: 'rgba(16, 185, 129, 0.12)', label: 'Tier 1' },
+  2: { color: '#16a34a', bg: 'rgba(22, 163, 74, 0.12)', label: 'Tier 2' },
+  3: { color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.12)', label: 'Tier 3' },
+  4: { color: '#f97316', bg: 'rgba(249, 115, 22, 0.12)', label: 'Tier 4' },
+  5: { color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.15)', label: 'Tier 5' },
 };
 
 interface LogContributionModalProps {
@@ -101,6 +102,12 @@ function ModalOverlay({
   onClose: () => void;
   children: React.ReactNode;
 }) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -109,8 +116,26 @@ function ModalOverlay({
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  return (
-    <div className="modal-overlay">
+  if (!mounted) return null;
+
+  return createPortal(
+    <div
+      className="modal-overlay animate-fade-in"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        width: '100vw',
+        height: '100vh',
+        zIndex: 99999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 20,
+        background: 'rgba(0, 0, 0, 0.65)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
+      }}
+    >
       <div
         onClick={onClose}
         style={{
@@ -121,7 +146,8 @@ function ModalOverlay({
       <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 580 }}>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

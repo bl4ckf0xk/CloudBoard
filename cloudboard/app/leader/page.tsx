@@ -1010,11 +1010,14 @@ export default function LeaderDashboardPage() {
     try {
       const updated = await submissionService.approveSubmission(subId, currentUser.id);
       setSubmissions((prev) => prev.map((s) => (s.id === subId ? updated : s)));
-      setUsers((prev) =>
-        prev.map((u) => (u.id === updated.targetUserId ? { ...u, totalPoints: (u.totalPoints || 0) + updated.points } : u))
-      );
-      setTotalPoints((prev) => prev + updated.points);
+      const [freshUsers, pts] = await Promise.all([
+        userService.getAllUsers(),
+        submissionService.getTotalPointsAwarded(),
+      ]);
+      setUsers(freshUsers);
+      setTotalPoints(pts);
       showToast(`Submission approved (+${updated.points} pts awarded)`, 'success');
+      window.dispatchEvent(new CustomEvent('contribution-submitted'));
     } catch (err: any) {
       showToast(err.message || 'Failed to approve submission', 'info');
     }
@@ -1025,6 +1028,7 @@ export default function LeaderDashboardPage() {
       const updated = await submissionService.rejectSubmission(subId, currentUser.id);
       setSubmissions((prev) => prev.map((s) => (s.id === subId ? updated : s)));
       showToast('Submission rejected', 'info');
+      window.dispatchEvent(new CustomEvent('contribution-submitted'));
     } catch (err: any) {
       showToast(err.message || 'Failed to reject submission', 'info');
     }

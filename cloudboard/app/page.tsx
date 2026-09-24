@@ -121,8 +121,70 @@ function StatCard({
 }
 
 // ─── Contribution Trends Chart (SVG) ──────────────────────
-function ContributionTrendsChart() {
-  const [timeRange, setTimeRange] = useState('8w');
+// ─── Contribution Trends Chart (Dynamic SVG) ──────────────────────
+function ContributionTrendsChart({ submissions = [] }: { submissions?: PointSubmission[] }) {
+  const [timeRange, setTimeRange] = useState<'4w' | '8w' | 'quarter'>('8w');
+
+  const numWeeks = timeRange === '4w' ? 4 : timeRange === '8w' ? 8 : 12;
+
+  const weeklyData = useMemo(() => {
+    const weeks = Array.from({ length: numWeeks }, (_, i) => ({
+      label: `Wk ${i + 1}`,
+      internal: 0,
+      crossDept: 0,
+    }));
+
+    const now = Date.now();
+    const weekMs = 7 * 24 * 60 * 60 * 1000;
+
+    submissions.forEach((s) => {
+      if (s.status !== 'approved') return;
+      const subTime = new Date(s.createdAt).getTime();
+      const diffWeeks = Math.floor((now - subTime) / weekMs);
+      const index = numWeeks - 1 - diffWeeks;
+      if (index >= 0 && index < numWeeks) {
+        if (s.cross_dept) {
+          weeks[index].crossDept += s.points;
+        } else {
+          weeks[index].internal += s.points;
+        }
+      }
+    });
+
+    return weeks;
+  }, [submissions, numWeeks]);
+
+  const maxVal = Math.max(
+    50,
+    ...weeklyData.map((d) => Math.max(d.internal, d.crossDept))
+  );
+  const roundedMax = Math.ceil(maxVal / 50) * 50;
+
+  const chartWidth = 520;
+  const chartHeight = 160;
+  const startX = 50;
+  const startY = 25;
+  const stepX = chartWidth / (numWeeks - 1 || 1);
+
+  const internalPoints = weeklyData.map((d, i) => {
+    const x = startX + i * stepX;
+    const y = startY + chartHeight - (d.internal / roundedMax) * chartHeight;
+    return { x, y, val: d.internal };
+  });
+
+  const crossPoints = weeklyData.map((d, i) => {
+    const x = startX + i * stepX;
+    const y = startY + chartHeight - (d.crossDept / roundedMax) * chartHeight;
+    return { x, y, val: d.crossDept };
+  });
+
+  const internalPath = internalPoints.reduce((acc, p, i) => {
+    return i === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`;
+  }, '');
+
+  const crossPath = crossPoints.reduce((acc, p, i) => {
+    return i === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`;
+  }, '');
 
   return (
     <div
@@ -153,7 +215,7 @@ function ContributionTrendsChart() {
               letterSpacing: '-0.02em',
             }}
           >
-            Contribution Trends
+            Points Activity Trends
           </h2>
           <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 2 }}>
             Points awarded per week, internal vs cross-department
@@ -162,7 +224,7 @@ function ContributionTrendsChart() {
 
         <select
           value={timeRange}
-          onChange={(e) => setTimeRange(e.target.value)}
+          onChange={(e) => setTimeRange(e.target.value as '4w' | '8w' | 'quarter')}
           className="custom-select"
           style={{ width: 'auto', padding: '6px 30px 6px 12px', fontSize: '0.8rem' }}
         >
@@ -179,82 +241,78 @@ function ContributionTrendsChart() {
           style={{ width: '100%', height: 'auto', overflow: 'visible' }}
         >
           {/* Grid lines */}
-          <line x1="40" y1="20" x2="580" y2="20" stroke="var(--border-subtle)" strokeDasharray="3 3" />
-          <text x="15" y="24" fill="var(--text-muted)" fontSize="10" fontWeight="600">200</text>
+          <line x1="40" y1={startY} x2="580" y2={startY} stroke="var(--border-subtle)" strokeDasharray="3 3" />
+          <text x="10" y={startY + 4} fill="var(--text-muted)" fontSize="10" fontWeight="600">{roundedMax}</text>
 
-          <line x1="40" y1="65" x2="580" y2="65" stroke="var(--border-subtle)" strokeDasharray="3 3" />
-          <text x="15" y="69" fill="var(--text-muted)" fontSize="10" fontWeight="600">150</text>
+          <line x1="40" y1={startY + chartHeight / 2} x2="580" y2={startY + chartHeight / 2} stroke="var(--border-subtle)" strokeDasharray="3 3" />
+          <text x="10" y={startY + chartHeight / 2 + 4} fill="var(--text-muted)" fontSize="10" fontWeight="600">{Math.round(roundedMax / 2)}</text>
 
-          <line x1="40" y1="110" x2="580" y2="110" stroke="var(--border-subtle)" strokeDasharray="3 3" />
-          <text x="15" y="114" fill="var(--text-muted)" fontSize="10" fontWeight="600">100</text>
-
-          <line x1="40" y1="155" x2="580" y2="155" stroke="var(--border-subtle)" strokeDasharray="3 3" />
-          <text x="20" y="159" fill="var(--text-muted)" fontSize="10" fontWeight="600">50</text>
-
-          <line x1="40" y1="195" x2="580" y2="195" stroke="var(--border-subtle)" />
-          <text x="25" y="199" fill="var(--text-muted)" fontSize="10" fontWeight="600">0</text>
+          <line x1="40" y1={startY + chartHeight} x2="580" y2={startY + chartHeight} stroke="var(--border-subtle)" />
+          <text x="25" y={startY + chartHeight + 4} fill="var(--text-muted)" fontSize="10" fontWeight="600">0</text>
 
           {/* Solid Line: Internal Dept (Indigo) */}
           <path
-            d="M 50 145 C 90 140, 130 130, 170 132 C 210 134, 240 120, 280 102 C 320 85, 360 82, 400 88 C 440 94, 480 72, 520 62 C 540 58, 560 55, 570 52"
+            d={internalPath}
             fill="none"
             stroke="#6366f1"
             strokeWidth="3.5"
             strokeLinecap="round"
+            strokeLinejoin="round"
           />
 
           {/* Dots on Internal Line */}
-          {[
-            [50, 145], [120, 132], [195, 135], [280, 102], [360, 84], [435, 90], [515, 64], [570, 52]
-          ].map(([cx, cy], i) => (
+          {internalPoints.map((p, i) => (
             <circle
               key={`dot1-${i}`}
-              cx={cx}
-              cy={cy}
+              cx={p.x}
+              cy={p.y}
               r="4.5"
               fill="#ffffff"
               stroke="#6366f1"
               strokeWidth="2.5"
-            />
+            >
+              <title>{`Internal: ${p.val} pts (${weeklyData[i]?.label})`}</title>
+            </circle>
           ))}
 
           {/* Dashed Line: Cross-Dept / Collab (Teal) */}
           <path
-            d="M 50 178 C 90 170, 130 165, 170 166 C 210 167, 240 148, 280 140 C 320 132, 360 130, 400 125 C 440 120, 480 105, 520 95 C 540 90, 560 85, 570 82"
+            d={crossPath}
             fill="none"
             stroke="#10b981"
             strokeWidth="3"
             strokeDasharray="5 5"
             strokeLinecap="round"
+            strokeLinejoin="round"
           />
 
           {/* Dots on Collab Line */}
-          {[
-            [50, 178], [120, 166], [195, 168], [280, 140], [360, 128], [435, 122], [515, 97], [570, 82]
-          ].map(([cx, cy], i) => (
+          {crossPoints.map((p, i) => (
             <circle
               key={`dot2-${i}`}
-              cx={cx}
-              cy={cy}
+              cx={p.x}
+              cy={p.y}
               r="4"
               fill="#ffffff"
               stroke="#10b981"
               strokeWidth="2"
-            />
+            >
+              <title>{`Cross-dept: ${p.val} pts (${weeklyData[i]?.label})`}</title>
+            </circle>
           ))}
 
           {/* X Axis Week Labels */}
-          {['Wk 1', 'Wk 2', 'Wk 3', 'Wk 4', 'Wk 5', 'Wk 6', 'Wk 7', 'Wk 8'].map((wk, i) => (
+          {weeklyData.map((d, i) => (
             <text
-              key={wk}
-              x={50 + i * 74}
-              y="215"
+              key={d.label}
+              x={startX + i * stepX}
+              y="210"
               textAnchor="middle"
               fill="var(--text-muted)"
               fontSize="10"
               fontWeight="600"
             >
-              {wk}
+              {d.label}
             </text>
           ))}
         </svg>
@@ -460,34 +518,35 @@ export default function HomePage() {
         }}
       >
         <StatCard
-          label="Total Contributions"
-          value={submissions.length > 0 ? (submissions.length * 48 + 3842).toLocaleString() : '3,842'}
-          trend="↑ 12%"
-          subtext="vs last quarter"
+          label="Total Activity"
+          value={submissions.length.toLocaleString()}
+          trend={`${approvedSubmissions.length} approved`}
+          subtext="logged across all teams"
           icon={<TrendingUp size={20} />}
           delay={50}
         />
         <StatCard
           label="Active Committees"
-          value={departments.length > 0 ? departments.length : '9'}
-          subtext={`across ${departments.length || 4} departments`}
+          value={departments.length}
+          trend={`${users.length} members`}
+          subtext={`across ${departments.length} teams`}
           icon={<Users size={20} />}
           delay={100}
         />
         <StatCard
           label="Pending Approvals"
           value={pendingSubmissions.length}
-          trend={`${pendingSubmissions.length} awaiting`}
-          trendPositive={false}
+          trend={pendingSubmissions.length > 0 ? `${pendingSubmissions.length} awaiting` : 'All cleared'}
+          trendPositive={pendingSubmissions.length === 0}
           subtext="in workflow queue"
           icon={<Clock size={20} />}
           delay={150}
         />
         <StatCard
           label="Total Reward Points"
-          value={totalPoints > 0 ? totalPoints.toLocaleString() : '24,910'}
-          trend="↑ 8%"
-          subtext="vs last quarter"
+          value={(totalPoints > 0 ? totalPoints : users.reduce((sum, u) => sum + (u.totalPoints || 0), 0)).toLocaleString()}
+          trend="Live total"
+          subtext="earned across organization"
           icon={<Sparkles size={20} />}
           delay={200}
         />
@@ -497,7 +556,7 @@ export default function HomePage() {
       <div className="cb-grid-2col">
         {/* Left: Contribution Trends Line Chart */}
         <div>
-          <ContributionTrendsChart />
+          <ContributionTrendsChart submissions={submissions} />
         </div>
 
         {/* Right: Leaderboard Mini Panel */}
@@ -743,35 +802,46 @@ export default function HomePage() {
               borderTop: '1px solid var(--border-subtle)',
             }}
           >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                fontSize: '0.75rem',
-                marginBottom: 6,
-              }}
-            >
-              <span style={{ color: 'var(--text-muted)' }}>Collaboration impact</span>
-              <span style={{ fontWeight: 700, color: 'var(--accent-green)' }}>+12% boost applied</span>
-            </div>
-            <div
-              style={{
-                height: 6,
-                background: 'rgba(16, 185, 129, 0.15)',
-                borderRadius: 4,
-                overflow: 'hidden',
-              }}
-            >
-              <div
-                style={{
-                  width: '68%',
-                  height: '100%',
-                  background: 'var(--accent-green)',
-                  borderRadius: 4,
-                }}
-              />
-            </div>
+            {(() => {
+              const crossCount = approvedSubmissions.filter((s) => s.cross_dept).length;
+              const crossPct = approvedSubmissions.length > 0 ? Math.round((crossCount / approvedSubmissions.length) * 100) : 0;
+              return (
+                <>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      fontSize: '0.75rem',
+                      marginBottom: 6,
+                    }}
+                  >
+                    <span style={{ color: 'var(--text-muted)' }}>Cross-Department Impact</span>
+                    <span style={{ fontWeight: 700, color: 'var(--accent-green)' }}>
+                      {crossPct}% ({crossCount} cross-team)
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      height: 6,
+                      background: 'rgba(16, 185, 129, 0.15)',
+                      borderRadius: 4,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: `${Math.min(100, Math.max(0, crossPct))}%`,
+                        height: '100%',
+                        background: 'var(--accent-green)',
+                        borderRadius: 4,
+                        transition: 'width 0.4s ease',
+                      }}
+                    />
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       </div>
@@ -901,24 +971,40 @@ export default function HomePage() {
                         {relativeTime(sub.createdAt)}
                       </span>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <button
-                          onClick={() => handleApprove(sub.id)}
-                          aria-label="Approve submission"
-                          title="Approve"
-                          className="btn-action-approve"
+                      {ROLE_RANK[currentUser.role] >= ROLE_RANK['dept-head'] ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <button
+                            onClick={() => handleApprove(sub.id)}
+                            aria-label="Approve submission"
+                            title="Approve"
+                            className="btn-action-approve"
+                          >
+                            <Check size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleReject(sub.id)}
+                            aria-label="Reject submission"
+                            title="Reject"
+                            className="btn-action-reject"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ) : (
+                        <span
+                          style={{
+                            fontSize: '0.7rem',
+                            padding: '3px 8px',
+                            borderRadius: 6,
+                            background: 'rgba(245, 158, 11, 0.1)',
+                            color: 'var(--accent-amber)',
+                            border: '1px solid rgba(245, 158, 11, 0.3)',
+                            fontWeight: 600,
+                          }}
                         >
-                          <Check size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleReject(sub.id)}
-                          aria-label="Reject submission"
-                          title="Reject"
-                          className="btn-action-reject"
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
+                          Under Review
+                        </span>
+                      )}
                     </div>
                   </div>
                 );
@@ -970,7 +1056,7 @@ export default function HomePage() {
             <EmptyState
               icon="⭐"
               title="No recognitions yet"
-              description="Be the first to award points to a teammate using '+ Log Contribution' above."
+              description="Be the first to award points to a teammate using '+ Award Points' above."
             />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
