@@ -29,6 +29,7 @@ export interface User {
   name: string;
   email: string;
   avatarInitials: string;
+  avatarUrl?: string;
   role: UserRole;
   deptId: DeptId;
   joinDate: string;
@@ -58,7 +59,10 @@ export interface PointSubmission {
   status: SubmissionStatus;
   createdAt: string;
   approvedBy?: string;
+  approvedByName?: string;
   reviewedAt?: string;
+  requestedApproverId?: string;
+  requestedApproverRole?: 'dept-head' | 'leader';
 }
 
 export interface CreateSubmissionDTO {
@@ -69,6 +73,8 @@ export interface CreateSubmissionDTO {
   points: number;
   reason: string;
   category: SubmissionCategory;
+  requestedApproverId?: string;
+  requestedApproverRole?: 'dept-head' | 'leader';
 }
 
 export type EventStatus = 'upcoming' | 'ongoing' | 'completed';

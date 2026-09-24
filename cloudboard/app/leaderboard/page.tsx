@@ -70,9 +70,30 @@ function Podium({ top3, deptMap }: { top3: User[]; deptMap: Map<string, Departme
                 color: user.avatarColor,
                 boxShadow: `0 8px 24px ${medal.ring}`,
                 position: 'relative',
+                overflow: 'visible',
               }}
             >
-              {user.avatarInitials}
+              <div
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  borderRadius: '50%',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {user.avatarUrl ? (
+                  <img
+                    src={user.avatarUrl}
+                    alt={user.name}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  user.avatarInitials
+                )}
+              </div>
               <div
                 style={{
                   position: 'absolute',
@@ -186,8 +207,11 @@ export default function LeaderboardPage() {
 
   const deptMap = useMemo(() => new Map(departments.map((d) => [d.id, d])), [departments]);
 
+  const CONTRIBUTOR_ROLES = useMemo(() => ROLE_ORDER.filter((r) => r !== 'leader'), []);
+
   const rankedMembers = useMemo(() => {
-    let list = [...members];
+    // Contributor leaderboard excludes 'leader' role (leadership oversees, does not compete)
+    let list = members.filter((m) => m.role !== 'leader');
     if (roleFilter !== 'all') {
       list = list.filter((m) => m.role === roleFilter);
     }
@@ -235,9 +259,9 @@ export default function LeaderboardPage() {
           </p>
         </div>
 
-        {/* Role Filters Segmented Control */}
+        {/* Role Filters Segmented Control - Leader role removed per requirements */}
         <div className="filter-segmented">
-          {(['all', ...ROLE_ORDER] as const).map((r) => {
+          {(['all', ...CONTRIBUTOR_ROLES] as const).map((r) => {
             const isActive = roleFilter === r;
             return (
               <button
@@ -315,9 +339,18 @@ export default function LeaderboardPage() {
                   fontSize: '0.85rem',
                   fontWeight: 800,
                   color: user.avatarColor,
+                  overflow: 'hidden',
                 }}
               >
-                {user.avatarInitials}
+                {user.avatarUrl ? (
+                  <img
+                    src={user.avatarUrl}
+                    alt={user.name}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  user.avatarInitials
+                )}
               </div>
 
               {/* Info */}

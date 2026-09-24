@@ -67,12 +67,13 @@ interface RoleContextValue {
   forgotPassword: (email: string) => Promise<{ codeDeliveryDetails?: any }>;
   confirmForgotPassword: (email: string, code: string, newPass: string) => Promise<void>;
   completeNewPasswordChallenge: (email: string, newPass: string, session: string) => Promise<void>;
+  updateUserAvatar: (avatarUrl: string) => Promise<void>;
 }
 
 const RoleContext = createContext<RoleContextValue | null>(null);
 
 export function RoleProvider({ children }: { children: React.ReactNode }) {
-  const initialSeed = isAwsBackend ? [] : INITIAL_USERS;
+  const initialSeed = INITIAL_USERS;
   const defaultUser = initialSeed.find((u) => u.role === 'leader') ?? initialSeed[0] ?? DEFAULT_ANONYMOUS_USER;
 
   const [allUsers, setAllUsers] = useState<User[]>(initialSeed);
@@ -80,6 +81,18 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   const [cognitoUser, setCognitoUser] = useState<CognitoUserSession | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState<boolean>(true);
+
+  const updateUserAvatar = useCallback(async (avatarUrl: string) => {
+    try {
+      const updated = await userService.updateUserAvatar(currentUser.id, avatarUrl);
+      setCurrentUserState(updated);
+      setAllUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+    } catch (err) {
+      logger.error('[RoleProvider] Failed to update avatar:', err);
+      setCurrentUserState((prev) => ({ ...prev, avatarUrl }));
+      setAllUsers((prev) => prev.map((u) => (u.id === currentUser.id ? { ...u, avatarUrl } : u)));
+    }
+  }, [currentUser.id]);
 
   const refreshUsers = useCallback(async () => {
     try {
@@ -265,6 +278,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     forgotPassword,
     confirmForgotPassword,
     completeNewPasswordChallenge,
+    updateUserAvatar,
   };
 
   return <RoleContext.Provider value={value}>{children}</RoleContext.Provider>;

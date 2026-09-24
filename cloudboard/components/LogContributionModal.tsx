@@ -138,6 +138,8 @@ export default function LogContributionModal({
   const [selectedTemplate, setSelectedTemplate] = useState<ContributionTemplate | null>(null);
   const [targetDeptId, setTargetDeptId] = useState<DeptId>(currentUser.deptId);
   const [targetUserId, setTargetUserId] = useState<string>('');
+  const [approverType, setApproverType] = useState<'dept-head' | 'leader'>('dept-head');
+  const [selectedApproverId, setSelectedApproverId] = useState<string>('');
   const [reason, setReason] = useState<string>('');
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string>('');
@@ -155,15 +157,22 @@ export default function LogContributionModal({
       setSelectedTemplate(null);
       setTargetDeptId(currentUser.deptId);
       setTargetUserId('');
+      setApproverType('dept-head');
+      const head = allUsers.find((u) => u.deptId === currentUser.deptId && u.role === 'dept-head');
+      setSelectedApproverId(head?.id || '');
       setReason('');
       setSubmitted(false);
       setError('');
     }
-  }, [isOpen, currentUser.deptId]);
+  }, [isOpen, currentUser.deptId, allUsers]);
 
   useEffect(() => {
     setTargetUserId('');
-  }, [targetDeptId]);
+    if (approverType === 'dept-head') {
+      const head = allUsers.find((u) => u.deptId === targetDeptId && u.role === 'dept-head');
+      if (head) setSelectedApproverId(head.id);
+    }
+  }, [targetDeptId, approverType, allUsers]);
 
   const eligibleTargets = allUsers.filter(
     (u) => u.deptId === targetDeptId && u.id !== currentUser.id
@@ -190,6 +199,8 @@ export default function LogContributionModal({
         points: selectedTemplate.points,
         reason: reason.trim(),
         category: selectedTemplate.category,
+        requestedApproverId: selectedApproverId || undefined,
+        requestedApproverRole: approverType,
       };
 
       const validation = validateSubmissionInput(input);
@@ -211,7 +222,7 @@ export default function LogContributionModal({
         setIsSubmitting(false);
       }
     },
-    [currentUser, targetDeptId, targetUserId, selectedTemplate, reason, isCrossDept, onSubmitted]
+    [currentUser, targetDeptId, targetUserId, selectedTemplate, reason, isCrossDept, approverType, selectedApproverId, onSubmitted]
   );
 
   if (!isOpen) return null;
@@ -608,6 +619,93 @@ export default function LogContributionModal({
                     {u.name} · {u.role.replace('-', ' ')}
                   </option>
                 ))}
+              </select>
+            </div>
+
+            {/* Approver Selection */}
+            <div style={{ marginTop: 18 }}>
+              <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: 8 }}>
+                Assign Approver
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setApproverType('dept-head');
+                    const head = allUsers.find((u) => u.deptId === targetDeptId && u.role === 'dept-head');
+                    if (head) setSelectedApproverId(head.id);
+                  }}
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: 10,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    border: `1.5px solid ${approverType === 'dept-head' ? 'var(--accent-indigo)' : 'var(--border-subtle)'}`,
+                    background: approverType === 'dept-head' ? 'var(--accent-indigo-subtle)' : 'var(--bg-card)',
+                    transition: 'all 0.18s ease',
+                  }}
+                >
+                  <p style={{ fontSize: '0.78rem', fontWeight: 700, color: approverType === 'dept-head' ? 'var(--accent-indigo)' : 'var(--text-primary)' }}>
+                    🏛 Dept Head
+                  </p>
+                  <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                    Department review
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setApproverType('leader');
+                    const leader = allUsers.find((u) => u.role === 'leader');
+                    if (leader) setSelectedApproverId(leader.id);
+                  }}
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: 10,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    border: `1.5px solid ${approverType === 'leader' ? 'var(--accent-indigo)' : 'var(--border-subtle)'}`,
+                    background: approverType === 'leader' ? 'var(--accent-indigo-subtle)' : 'var(--bg-card)',
+                    transition: 'all 0.18s ease',
+                  }}
+                >
+                  <p style={{ fontSize: '0.78rem', fontWeight: 700, color: approverType === 'leader' ? 'var(--accent-indigo)' : 'var(--text-primary)' }}>
+                    🌐 Leader
+                  </p>
+                  <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                    Executive review
+                  </p>
+                </button>
+              </div>
+
+              <select
+                value={selectedApproverId}
+                onChange={(e) => setSelectedApproverId(e.target.value)}
+                className="custom-select"
+                style={{ fontSize: '0.82rem' }}
+              >
+                {approverType === 'dept-head' ? (
+                  <>
+                    {allUsers
+                      .filter((u) => u.role === 'dept-head')
+                      .map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name} (Head of {departments.find((d) => d.id === u.deptId)?.shortName || u.deptId})
+                        </option>
+                      ))}
+                  </>
+                ) : (
+                  <>
+                    {allUsers
+                      .filter((u) => u.role === 'leader')
+                      .map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name} (Executive Leader)
+                        </option>
+                      ))}
+                  </>
+                )}
               </select>
             </div>
 

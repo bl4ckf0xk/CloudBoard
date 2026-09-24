@@ -414,9 +414,18 @@ export default function DepartmentsPage() {
                                 fontSize: '0.68rem',
                                 fontWeight: 800,
                                 color: member.avatarColor,
+                                overflow: 'hidden',
                               }}
                             >
-                              {member.avatarInitials}
+                              {member.avatarUrl ? (
+                                <img
+                                  src={member.avatarUrl}
+                                  alt={member.name}
+                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                />
+                              ) : (
+                                member.avatarInitials
+                              )}
                             </div>
 
                             <div style={{ flex: 1, minWidth: 0 }}>

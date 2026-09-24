@@ -36,6 +36,10 @@ function saveSubmissions(submissions: PointSubmission[]): void {
 }
 
 export class LocalSubmissionService implements ISubmissionService {
+  async getAllSubmissions(): Promise<PointSubmission[]> {
+    return getStoredSubmissions();
+  }
+
   async getSubmissions(
     filters?: SubmissionFilters
   ): Promise<PointSubmission[]> {
@@ -118,6 +122,28 @@ export class LocalSubmissionService implements ISubmissionService {
     };
     subs[idx] = updated;
     saveSubmissions(subs);
+
+    // Update target member's points
+    const targetUserId = updated.targetUserId;
+    const pointsAwarded = updated.points;
+    if (typeof window !== 'undefined') {
+      try {
+        const rawUsers = window.localStorage.getItem('cloudboard_members');
+        if (rawUsers) {
+          const parsedUsers = JSON.parse(rawUsers);
+          if (Array.isArray(parsedUsers)) {
+            const uIdx = parsedUsers.findIndex((u: any) => u.id === targetUserId);
+            if (uIdx !== -1) {
+              parsedUsers[uIdx].totalPoints = (parsedUsers[uIdx].totalPoints || 0) + pointsAwarded;
+              window.localStorage.setItem('cloudboard_members', JSON.stringify(parsedUsers));
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[LocalSubmissionService] Failed to update member points', err);
+      }
+    }
+
     return updated;
   }
 

@@ -84,4 +84,24 @@ export class LocalUserService implements IUserService {
     saveUsers(users);
     return updatedUser;
   }
+
+  async updateUserAvatar(userId: string, avatarUrl: string): Promise<User> {
+    const users = getStoredUsers();
+    const idx = users.findIndex((u) => u.id === userId);
+    if (idx === -1) {
+      throw new Error(`User with ID ${userId} not found.`);
+    }
+    const updatedUser: User = {
+      ...users[idx],
+      avatarUrl,
+    };
+    users[idx] = updatedUser;
+    saveUsers(users);
+    return updatedUser;
+  }
+
+  invalidateCache(): void {
+    // Local storage is synchronous; no in-memory cache to invalidate
+  }
 }
+

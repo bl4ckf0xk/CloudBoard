@@ -7,6 +7,7 @@ import { IUserService } from '../../contracts/IUserService';
 import { User, UserRole, DeptId } from '../../types';
 import { awsFetch } from './awsClient';
 import { logger } from '@/lib/logger';
+import { INITIAL_USERS } from '../local/seedData';
 
 // Map Department names from DynamoDB to CloudBoard DeptId tokens
 const DEPT_NAME_TO_ID: Record<string, DeptId> = {
@@ -67,13 +68,16 @@ export function mapAwsMemberToUser(raw: any): User {
   const { name, initials } = parseEmailToName(email);
   const deptId = normalizeDept(raw.dept || raw.department);
   const role = normalizeRole(raw.role);
-  const totalPoints = typeof raw.total_points === 'number' ? raw.total_points : parseInt(raw.total_points || '0', 10) || 0;
+  const rawPoints = raw.total_points ?? raw.totalPoints ?? raw.points ?? raw.Points ?? raw.point ?? raw.score ?? 0;
+  const totalPoints = typeof rawPoints === 'number' ? rawPoints : parseInt(String(rawPoints) || '0', 10) || 0;
+  const avatarUrl = raw.avatar_url || raw.avatarUrl || undefined;
 
   return {
     id,
     name: raw.name || name,
     email,
     avatarInitials: initials,
+    avatarUrl,
     role,
     deptId,
     joinDate: raw.join_date || raw.created_at || new Date().toISOString().split('T')[0],
@@ -87,6 +91,11 @@ export class AwsUserService implements IUserService {
   private lastFetch = 0;
   private readonly CACHE_TTL_MS = 10_000; // 10 seconds
 
+  invalidateCache(): void {
+    this.cachedUsers = null;
+    this.lastFetch = 0;
+  }
+
   async getAllUsers(): Promise<User[]> {
     const now = Date.now();
     if (this.cachedUsers && now - this.lastFetch < this.CACHE_TTL_MS) {
@@ -96,16 +105,34 @@ export class AwsUserService implements IUserService {
     try {
       const data = await awsFetch<{ members?: any[]; Users?: any[] }>('/members');
       const rawList = data.members || data.Users || [];
-      if (Array.isArray(rawList)) {
+      if (Array.isArray(rawList) && rawList.length > 0) {
         const users = rawList.map(mapAwsMemberToUser);
         this.cachedUsers = users;
         this.lastFetch = now;
         return users;
       }
-      return this.cachedUsers || [];
+      if (this.cachedUsers && this.cachedUsers.length > 0) {
+        return this.cachedUsers;
+      }
+      return INITIAL_USERS;
     } catch (err: unknown) {
-      logger.warn('[AwsUserService] Failed to fetch users from AWS API:', err);
-      return this.cachedUsers || [];
+      logger.warn('[AwsUserService] Failed to fetch users from AWS API, using fallback data:', err);
+      if (!this.cachedUsers || this.cachedUsers.length === 0) {
+        if (typeof window !== 'undefined') {
+          try {
+            const raw = window.localStorage.getItem('cloudboard_members');
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                this.cachedUsers = parsed;
+                return parsed;
+              }
+            }
+          } catch {}
+        }
+        return INITIAL_USERS;
+      }
+      return this.cachedUsers;
     }
   }
 
@@ -127,6 +154,42 @@ export class AwsUserService implements IUserService {
   async getUsersByRole(role: UserRole): Promise<User[]> {
     const users = await this.getAllUsers();
     return users.filter((u) => u.role === role);
+  }
+
+  async updateUserAvatar(userId: string, avatarUrl: string): Promise<User> {
+    const users = await this.getAllUsers();
+    const idx = users.findIndex((u) => u.id === userId);
+    if (idx === -1) {
+      throw new Error(`User with ID ${userId} not found.`);
+    }
+
+    const updatedUser: User = {
+      ...users[idx],
+      avatarUrl,
+    };
+    users[idx] = updatedUser;
+    this.cachedUsers = [...users];
+
+    // Persist in localStorage for fallback/offline persistence
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem('cloudboard_members', JSON.stringify(users));
+        window.localStorage.setItem(`cloudboard_avatar_${userId}`, avatarUrl);
+      } catch (e) {
+        logger.warn('[AwsUserService] Failed to persist avatar to localStorage:', e);
+      }
+    }
+
+    try {
+      await awsFetch(`/members/${userId}/avatar`, {
+        method: 'PUT',
+        body: JSON.stringify({ avatar_url: avatarUrl }),
+      });
+    } catch (err: unknown) {
+      logger.warn('[AwsUserService] AWS API avatar update notice, applied locally:', err);
+    }
+
+    return updatedUser;
   }
 
   async overrideMemberPoints(
@@ -159,6 +222,13 @@ export class AwsUserService implements IUserService {
     };
     users[idx] = updatedUser;
     this.cachedUsers = users;
+
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem('cloudboard_members', JSON.stringify(users));
+      } catch {}
+    }
+
     return updatedUser;
   }
 }

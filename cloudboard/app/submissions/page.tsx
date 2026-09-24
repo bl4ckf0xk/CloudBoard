@@ -134,6 +134,17 @@ export default function SubmissionsPage() {
               </option>
             ))}
           </select>
+
+          <button
+            type="button"
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('cloudboard-open-log-modal'));
+            }}
+            className="cb-btn-primary"
+            style={{ fontSize: '0.8rem', padding: '7px 14px' }}
+          >
+            + Log
+          </button>
         </div>
       </div>
 

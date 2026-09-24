@@ -616,9 +616,18 @@ export default function HomePage() {
                         fontSize: 12,
                         fontWeight: 800,
                         flexShrink: 0,
+                        overflow: 'hidden',
                       }}
                     >
-                      {member.avatarInitials}
+                      {member.avatarUrl ? (
+                        <img
+                          src={member.avatarUrl}
+                          alt={member.name}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      ) : (
+                        member.avatarInitials
+                      )}
                     </span>
 
                     {/* Name & Department */}
@@ -878,7 +887,7 @@ export default function HomePage() {
                             flexWrap: 'wrap',
                           }}
                         >
-                          <span>{sub.title || 'Contribution log'}</span>
+                          <span>{sub.category || 'Contribution log'}</span>
                           <span>·</span>
                           <span style={{ color: 'var(--accent-amber)', fontWeight: 600 }}>
                             Awaiting Approval
@@ -1020,7 +1029,7 @@ export default function HomePage() {
                         </strong>{' '}
                         earned points for{' '}
                         <strong style={{ color: 'var(--accent-indigo)', fontWeight: 600 }}>
-                          {item.title || item.category}
+                          {item.category}
                         </strong>
                       </p>
 

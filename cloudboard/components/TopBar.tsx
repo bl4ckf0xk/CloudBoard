@@ -23,6 +23,15 @@ import {
   Building2,
   PenLine,
 } from 'lucide-react';
+import SearchOverlay from '@/components/SearchOverlay';
+import NotificationPanel from '@/components/NotificationPanel';
+import {
+  getStoredNotifications,
+  markAsRead,
+  markAllAsRead,
+  clearNotifications,
+  CBNotification,
+} from '@/lib/notifications';
 
 interface TopBarProps {
   onOpenMobileSidebar: () => void;
@@ -82,9 +91,20 @@ export default function TopBar({
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState<CBNotification[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const triggerId = useId();
   const dropdownId = useId();
+
+  // Sync notifications
+  useEffect(() => {
+    setNotifications(getStoredNotifications());
+    const handleUpdate = () => setNotifications(getStoredNotifications());
+    window.addEventListener('cloudboard-notifications-updated', handleUpdate);
+    return () => window.removeEventListener('cloudboard-notifications-updated', handleUpdate);
+  }, []);
 
   const routeMeta = ROUTE_INFO[pathname] || {
     title: 'Performance Tracking',
@@ -202,49 +222,91 @@ export default function TopBar({
 
       {/* Right: Search + Notifications + Theme Toggle + CTA Button + Profile */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-        {/* Search Input (Desktop) */}
-        <div className="topbar-search desktop-only">
+        {/* Search Input (Desktop) - Opens Spotlight Search */}
+        <div
+          className="topbar-search desktop-only"
+          onClick={() => setSearchOpen(true)}
+          style={{ cursor: 'pointer' }}
+          title="Global search (Cmd+K)"
+        >
           <Search size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
           <input
             type="text"
-            placeholder="Search members, tasks..."
+            placeholder="Search members, tasks... (⌘K)"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            readOnly
+            style={{ cursor: 'pointer' }}
           />
+          <kbd
+            style={{
+              padding: '1px 5px',
+              fontSize: '0.62rem',
+              color: 'var(--text-muted)',
+              background: 'var(--bg-muted)',
+              borderRadius: 4,
+              border: '1px solid var(--border-subtle)',
+            }}
+          >
+            ⌘K
+          </kbd>
         </div>
 
-        {/* Notification Bell */}
-        <button
-          aria-label="Notifications"
-          style={{
-            width: 38,
-            height: 38,
-            borderRadius: 10,
-            border: '1.5px solid var(--border-subtle)',
-            background: 'var(--bg-card)',
-            color: 'var(--text-secondary)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            position: 'relative',
-            transition: 'all 0.2s ease',
-          }}
-        >
-          <Bell size={18} />
-          <span
+        {/* Notification Bell with Panel */}
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => setNotificationsOpen((v) => !v)}
+            aria-label="Notifications"
+            title="Notifications"
             style={{
-              position: 'absolute',
-              top: 8,
-              right: 8,
-              width: 7,
-              height: 7,
-              borderRadius: '50%',
-              background: 'var(--accent-indigo)',
-              boxShadow: '0 0 6px var(--accent-indigo)',
+              width: 38,
+              height: 38,
+              borderRadius: 10,
+              border: `1.5px solid ${notificationsOpen ? 'var(--accent-indigo)' : 'var(--border-subtle)'}`,
+              background: notificationsOpen ? 'var(--accent-indigo-subtle)' : 'var(--bg-card)',
+              color: notificationsOpen ? 'var(--accent-indigo)' : 'var(--text-secondary)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              position: 'relative',
+              transition: 'all 0.2s ease',
             }}
+          >
+            <Bell size={18} />
+            {notifications.filter((n) => !n.read).length > 0 && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: 7,
+                  right: 7,
+                  minWidth: 16,
+                  height: 16,
+                  borderRadius: 8,
+                  background: 'var(--accent-indigo)',
+                  color: '#ffffff',
+                  fontSize: '0.62rem',
+                  fontWeight: 800,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '0 3px',
+                  boxShadow: '0 0 6px var(--accent-indigo)',
+                }}
+              >
+                {notifications.filter((n) => !n.read).length}
+              </span>
+            )}
+          </button>
+
+          <NotificationPanel
+            isOpen={notificationsOpen}
+            onClose={() => setNotificationsOpen(false)}
+            notifications={notifications}
+            onMarkRead={(id) => markAsRead(id)}
+            onMarkAllRead={() => markAllAsRead()}
+            onClearAll={() => clearNotifications()}
           />
-        </button>
+        </div>
 
         {/* Animated Dark/Light Mode Switch */}
         <button
@@ -316,9 +378,18 @@ export default function TopBar({
                 fontSize: 12,
                 fontWeight: 800,
                 flexShrink: 0,
+                overflow: 'hidden',
               }}
             >
-              {currentUser.avatarInitials}
+              {currentUser.avatarUrl ? (
+                <img
+                  src={currentUser.avatarUrl}
+                  alt={currentUser.name}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              ) : (
+                currentUser.avatarInitials
+              )}
             </span>
 
             <ChevronDown
@@ -372,9 +443,18 @@ export default function TopBar({
                     fontSize: 15,
                     fontWeight: 800,
                     flexShrink: 0,
+                    overflow: 'hidden',
                   }}
                 >
-                  {currentUser.avatarInitials}
+                  {currentUser.avatarUrl ? (
+                    <img
+                      src={currentUser.avatarUrl}
+                      alt={currentUser.name}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  ) : (
+                    currentUser.avatarInitials
+                  )}
                 </span>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div
@@ -582,6 +662,13 @@ export default function TopBar({
 
       {/* Cognito Auth Modal */}
       <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} />
+
+      {/* Global Search Overlay (Cmd+K) */}
+      <SearchOverlay
+        isOpen={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        initialQuery={searchQuery}
+      />
     </header>
   );
 }

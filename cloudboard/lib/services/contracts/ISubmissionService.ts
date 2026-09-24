@@ -13,6 +13,7 @@ export interface SubmissionFilters {
 }
 
 export interface ISubmissionService {
+  getAllSubmissions(): Promise<PointSubmission[]>;
   getSubmissions(filters?: SubmissionFilters): Promise<PointSubmission[]>;
   getSubmissionById(id: string): Promise<PointSubmission | null>;
   getSubmissionsForUser(userId: string): Promise<PointSubmission[]>;

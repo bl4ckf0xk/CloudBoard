@@ -108,6 +108,43 @@ export default function DashboardPage() {
       {/* Access note */}
       <AccessBanner dept={dept} />
 
+      {/* Quick stats & action banner */}
+      <div
+        className="glass-card animate-fade-in-up"
+        style={{
+          padding: '16px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 16,
+          background: 'linear-gradient(135deg, rgba(22, 163, 74, 0.08) 0%, rgba(99, 102, 241, 0.06) 100%)',
+          borderRadius: 16,
+        }}
+      >
+        <div>
+          <h1 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.03em', marginBottom: 2 }}>
+            Welcome back, {currentUser.name}! 👋
+          </h1>
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+            Track your verified contributions, review milestones, and monitor committee standings.
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('cloudboard-open-log-modal'));
+            }}
+            className="cb-btn-primary"
+            style={{ fontSize: '0.84rem', padding: '9px 18px' }}
+          >
+            + Log Contribution
+          </button>
+        </div>
+      </div>
+
       {/* ── Primary layout: 2-col on desktop ── */}
       <div className="cb-grid-dashboard">
         {/* ── LEFT COLUMN: Profile + Breakdown ── */}

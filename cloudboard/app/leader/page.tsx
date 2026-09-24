@@ -27,6 +27,9 @@ import {
   Lock,
   Pencil,
   ArrowRight,
+  Check,
+  X,
+  Clock,
 } from 'lucide-react';
 
 // ─── Stat Card ────────────────────────────────────────────────
@@ -478,6 +481,466 @@ function PointOverrideCell({
   );
 }
 
+// ─── All Department Submissions Section ────────────────────────
+
+function AllDepartmentSubmissionsSection({
+  submissions,
+  userMap,
+  deptMap,
+  departments,
+  onApprove,
+  onReject,
+}: {
+  submissions: PointSubmission[];
+  userMap: Map<string, User>;
+  deptMap: Map<string, Department>;
+  departments: Department[];
+  onApprove: (id: string) => void;
+  onReject: (id: string) => void;
+}) {
+  const [selectedDept, setSelectedDept] = useState<string>('all');
+  const [actioningId, setActioningId] = useState<string | null>(null);
+
+  const pendingSubs = useMemo(() => {
+    return submissions.filter((s) => {
+      if (s.status !== 'pending') return false;
+      if (selectedDept !== 'all') {
+        return s.home_dept === selectedDept || s.target_dept === selectedDept;
+      }
+      return true;
+    });
+  }, [submissions, selectedDept]);
+
+  const handleAction = async (id: string, action: 'approve' | 'reject') => {
+    setActioningId(id);
+    if (action === 'approve') {
+      await onApprove(id);
+    } else {
+      await onReject(id);
+    }
+    setActioningId(null);
+  };
+
+  return (
+    <div className="glass-card animate-fade-in-up" style={{ padding: '24px' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 16,
+          marginBottom: 20,
+        }}
+      >
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+              Cross-Department Pending Approvals
+            </h3>
+            <span
+              style={{
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                color: 'var(--accent-amber)',
+                background: 'rgba(245, 158, 11, 0.12)',
+                border: '1px solid rgba(245, 158, 11, 0.3)',
+                borderRadius: 6,
+                padding: '2px 8px',
+              }}
+            >
+              Executive Authority
+            </span>
+          </div>
+          <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 3 }}>
+            Review, override, and approve pending submissions from every department
+          </p>
+        </div>
+
+        {/* Dept Filter */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <select
+            value={selectedDept}
+            onChange={(e) => setSelectedDept(e.target.value)}
+            className="custom-select"
+            style={{ width: 'auto', minWidth: 170, fontSize: '0.8rem', padding: '6px 12px' }}
+          >
+            <option value="all">All Departments ({submissions.filter((s) => s.status === 'pending').length})</option>
+            {departments.map((d) => {
+              const count = submissions.filter(
+                (s) => s.status === 'pending' && (s.home_dept === d.id || s.target_dept === d.id)
+              ).length;
+              return (
+                <option key={d.id} value={d.id}>
+                  {d.name} ({count})
+                </option>
+              );
+            })}
+          </select>
+        </div>
+      </div>
+
+      {pendingSubs.length === 0 ? (
+        <div
+          style={{
+            textAlign: 'center',
+            padding: '36px 16px',
+            border: '1.5px dashed var(--border-subtle)',
+            borderRadius: 12,
+            background: 'var(--bg-subtle)',
+          }}
+        >
+          <CheckCircle2 size={32} style={{ color: 'var(--accent-green)', margin: '0 auto 10px', opacity: 0.8 }} />
+          <p style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+            All caught up!
+          </p>
+          <p style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: 4 }}>
+            No pending submissions require approval for this filter.
+          </p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 14 }}>
+          {pendingSubs.map((sub) => {
+            const submitter = userMap.get(sub.submitterId);
+            const targetUser = userMap.get(sub.targetUserId);
+            const homeDept = deptMap.get(sub.home_dept);
+            const targetDept = deptMap.get(sub.target_dept);
+            const isActioning = actioningId === sub.id;
+
+            return (
+              <div
+                key={sub.id}
+                style={{
+                  padding: '16px',
+                  borderRadius: 12,
+                  background: 'var(--bg-subtle)',
+                  border: '1.5px solid var(--border-subtle)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 12,
+                  position: 'relative',
+                }}
+              >
+                {/* Header */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                    <div
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: '50%',
+                        background: `${targetUser?.avatarColor || '#6366f1'}20`,
+                        border: `1.5px solid ${targetUser?.avatarColor || '#6366f1'}`,
+                        color: targetUser?.avatarColor || '#6366f1',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {targetUser?.avatarInitials || '??'}
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {submitter?.name || 'Unknown'} → <span style={{ color: 'var(--accent-indigo)' }}>{targetUser?.name || 'Unknown'}</span>
+                      </p>
+                      <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                        {homeDept?.shortName} {sub.cross_dept && `⇄ ${targetDept?.shortName}`} · {relativeTime(sub.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <span
+                    style={{
+                      padding: '3px 9px',
+                      borderRadius: 6,
+                      background: 'rgba(245, 158, 11, 0.15)',
+                      border: '1px solid rgba(245, 158, 11, 0.35)',
+                      fontSize: '0.76rem',
+                      fontWeight: 800,
+                      color: 'var(--accent-amber)',
+                      flexShrink: 0,
+                    }}
+                  >
+                    +{sub.points} pts
+                  </span>
+                </div>
+
+                {/* Reason */}
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.5, background: 'var(--bg-card)', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-subtle)' }}>
+                  &ldquo;{sub.reason}&rdquo;
+                </p>
+
+                {/* Approver requested note */}
+                {sub.requestedApproverRole && (
+                  <div style={{ fontSize: '0.68rem', color: 'var(--accent-indigo)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span>Routing: Requested {sub.requestedApproverRole === 'leader' ? 'Executive Leader' : 'Dept Head'} approval</span>
+                  </div>
+                )}
+
+                {/* Action buttons */}
+                <div style={{ display: 'flex', gap: 8, marginTop: 'auto' }}>
+                  <button
+                    disabled={isActioning}
+                    onClick={() => handleAction(sub.id, 'approve')}
+                    className="cb-btn-primary"
+                    style={{ flex: 1, padding: '7px 12px', fontSize: '0.78rem', justifyContent: 'center' }}
+                  >
+                    <Check size={14} /> Approve (+{sub.points} pts)
+                  </button>
+                  <button
+                    disabled={isActioning}
+                    onClick={() => handleAction(sub.id, 'reject')}
+                    className="cb-btn-secondary"
+                    style={{ padding: '7px 12px', fontSize: '0.78rem', color: 'var(--status-rejected-text)' }}
+                  >
+                    <X size={14} /> Reject
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Leader Approval Audit Section ─────────────────────────────
+// Requirement: "only leader should see the time dep head approve a entry and the details"
+
+function LeaderApprovalAuditSection({
+  submissions,
+  userMap,
+  deptMap,
+  departments,
+}: {
+  submissions: PointSubmission[];
+  userMap: Map<string, User>;
+  deptMap: Map<string, Department>;
+  departments: Department[];
+}) {
+  const [deptFilter, setDeptFilter] = useState<string>('all');
+  const [search, setSearch] = useState<string>('');
+
+  const approvedSubs = useMemo(() => {
+    return submissions
+      .filter((s) => s.status === 'approved')
+      .filter((s) => {
+        if (deptFilter !== 'all') {
+          return s.home_dept === deptFilter || s.target_dept === deptFilter;
+        }
+        return true;
+      })
+      .filter((s) => {
+        if (!search) return true;
+        const q = search.toLowerCase();
+        const submitter = userMap.get(s.submitterId)?.name.toLowerCase() || '';
+        const target = userMap.get(s.targetUserId)?.name.toLowerCase() || '';
+        const approver = s.approvedBy ? userMap.get(s.approvedBy)?.name.toLowerCase() || '' : '';
+        const reason = s.reason.toLowerCase();
+        return submitter.includes(q) || target.includes(q) || approver.includes(q) || reason.includes(q);
+      })
+      .sort((a, b) => {
+        const timeA = a.reviewedAt ? new Date(a.reviewedAt).getTime() : new Date(a.createdAt).getTime();
+        const timeB = b.reviewedAt ? new Date(b.reviewedAt).getTime() : new Date(b.createdAt).getTime();
+        return timeB - timeA;
+      });
+  }, [submissions, deptFilter, search, userMap]);
+
+  return (
+    <div className="glass-card animate-fade-in-up" style={{ padding: '24px' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 16,
+          marginBottom: 20,
+        }}
+      >
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+              Executive Approval & Audit Trail
+            </h3>
+            <span
+              style={{
+                fontSize: '0.68rem',
+                fontWeight: 700,
+                color: '#818cf8',
+                background: 'rgba(99, 102, 241, 0.12)',
+                border: '1px solid rgba(99, 102, 241, 0.3)',
+                borderRadius: 6,
+                padding: '2px 8px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+              }}
+            >
+              <Lock size={10} /> Leader-Only Audit View
+            </span>
+          </div>
+          <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 3 }}>
+            Verified timestamps, approving authority details, and full submission context across all departments
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div className="topbar-search" style={{ width: 180 }}>
+            <Search size={14} style={{ color: 'var(--text-muted)' }} />
+            <input
+              type="text"
+              placeholder="Search audit log..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          <select
+            value={deptFilter}
+            onChange={(e) => setDeptFilter(e.target.value)}
+            className="custom-select"
+            style={{ width: 'auto', minWidth: 150, fontSize: '0.8rem', padding: '6px 12px' }}
+          >
+            <option value="all">All Departments</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="cb-table-wrapper" style={{ maxHeight: 440, overflowY: 'auto' }}>
+        <table className="cb-table">
+          <thead>
+            <tr>
+              <th>Contributor & Target</th>
+              <th>Dept</th>
+              <th>Points & Category</th>
+              <th>Approving Authority</th>
+              <th>Approval Timestamp</th>
+              <th>Contribution Details</th>
+            </tr>
+          </thead>
+          <tbody>
+            {approvedSubs.length === 0 ? (
+              <tr>
+                <td colSpan={6} style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>
+                  No approved entries found matching the filter.
+                </td>
+              </tr>
+            ) : (
+              approvedSubs.map((sub) => {
+                const submitter = userMap.get(sub.submitterId);
+                const recipient = userMap.get(sub.targetUserId);
+                const targetDept = deptMap.get(sub.target_dept);
+                const homeDept = deptMap.get(sub.home_dept);
+                const approver = sub.approvedBy ? userMap.get(sub.approvedBy) : null;
+                const approverName = approver?.name || sub.approvedByName || (sub.approvedBy ? `ID: ${sub.approvedBy.slice(0, 12)}...` : 'Dept Head');
+                const approverRoleMeta = approver ? getRoleMeta(approver.role) : null;
+                const approverBadge = approver ? getBadgeColors(approver.role) : null;
+
+                const approvalFormatted = sub.reviewedAt
+                  ? new Date(sub.reviewedAt).toLocaleString('en-IN', {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                    })
+                  : formatDate(sub.createdAt);
+
+                return (
+                  <tr key={sub.id}>
+                    <td>
+                      <div>
+                        <p style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                          {submitter?.name || 'Member'} → <span style={{ color: 'var(--accent-indigo)' }}>{recipient?.name || 'Member'}</span>
+                        </p>
+                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                          Submitted {relativeTime(sub.createdAt)}
+                        </p>
+                      </div>
+                    </td>
+                    <td>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                        {homeDept?.shortName} {sub.cross_dept && `⇄ ${targetDept?.shortName}`}
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span
+                          style={{
+                            fontWeight: 800,
+                            fontSize: '0.8rem',
+                            color: 'var(--accent-green)',
+                          }}
+                        >
+                          +{sub.points} pts
+                        </span>
+                        <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                          · {sub.category}
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      <div>
+                        <p style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                          {approverName}
+                        </p>
+                        <span
+                          style={{
+                            fontSize: '0.64rem',
+                            fontWeight: 700,
+                            color: approverBadge?.text || 'var(--text-muted)',
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          {approverRoleMeta?.label || 'Approver'}
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      <div>
+                        <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent-indigo)' }}>
+                          {approvalFormatted}
+                        </p>
+                        <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                          {sub.reviewedAt ? relativeTime(sub.reviewedAt) : 'Logged'}
+                        </p>
+                      </div>
+                    </td>
+                    <td style={{ maxWidth: 260 }}>
+                      <p
+                        style={{
+                          fontSize: '0.75rem',
+                          color: 'var(--text-secondary)',
+                          lineHeight: 1.4,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                        }}
+                        title={sub.reason}
+                      >
+                        {sub.reason}
+                      </p>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────
 
 export default function LeaderDashboardPage() {
@@ -540,6 +1003,30 @@ export default function LeaderDashboardPage() {
       showToast('Member points successfully updated', 'success');
     } catch (err: any) {
       showToast(err.message || 'Failed to update points', 'info');
+    }
+  };
+
+  const handleApprove = async (subId: string) => {
+    try {
+      const updated = await submissionService.approveSubmission(subId, currentUser.id);
+      setSubmissions((prev) => prev.map((s) => (s.id === subId ? updated : s)));
+      setUsers((prev) =>
+        prev.map((u) => (u.id === updated.targetUserId ? { ...u, totalPoints: (u.totalPoints || 0) + updated.points } : u))
+      );
+      setTotalPoints((prev) => prev + updated.points);
+      showToast(`Submission approved (+${updated.points} pts awarded)`, 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to approve submission', 'info');
+    }
+  };
+
+  const handleReject = async (subId: string) => {
+    try {
+      const updated = await submissionService.rejectSubmission(subId, currentUser.id);
+      setSubmissions((prev) => prev.map((s) => (s.id === subId ? updated : s)));
+      showToast('Submission rejected', 'info');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to reject submission', 'info');
     }
   };
 
@@ -692,6 +1179,24 @@ export default function LeaderDashboardPage() {
           icon={<Building2 size={20} />}
         />
       </div>
+
+      {/* All Department Submissions Approval Queue */}
+      <AllDepartmentSubmissionsSection
+        submissions={submissions}
+        userMap={userMap}
+        deptMap={deptMap}
+        departments={departments}
+        onApprove={handleApprove}
+        onReject={handleReject}
+      />
+
+      {/* Leader-Only Approval & Audit Log */}
+      <LeaderApprovalAuditSection
+        submissions={submissions}
+        userMap={userMap}
+        deptMap={deptMap}
+        departments={departments}
+      />
 
       {/* Certificate Trigger */}
       <CertificateSection

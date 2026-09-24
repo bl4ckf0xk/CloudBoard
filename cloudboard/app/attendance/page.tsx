@@ -1088,8 +1088,10 @@ export default function AttendancePage() {
       setDepartments(depts);
       setAllUsers(users);
 
-      if (evts.length > 0 && !selectedEventId) {
-        setSelectedEventId(evts[0].id);
+      if (evts.length > 0) {
+        setSelectedEventId((prev) => (prev && evts.some((e) => e.id === prev) ? prev : evts[0].id));
+      } else {
+        setSelectedEventId('');
       }
 
       const snapMap: Record<string, Record<string, AttendanceRecord>> = {};
@@ -1100,7 +1102,7 @@ export default function AttendancePage() {
     } catch (err) {
       console.error('[AttendancePage] Failed to load initial data', err);
     }
-  }, [selectedEventId]);
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -1129,6 +1131,7 @@ export default function AttendancePage() {
   const handleDeleteEvent = async (id: string) => {
     await attendanceService.deleteEvent(id, currentUser.id);
     setDeleteConfirm(null);
+    setSelectedEventId((prev) => (prev === id ? '' : prev));
     loadData();
   };
 
@@ -1245,7 +1248,7 @@ export default function AttendancePage() {
         </div>
 
         {/* RIGHT: Attendance panel */}
-        {selectedEvent && (
+        {selectedEvent ? (
           <AttendancePanel
             key={selectedEvent.id}
             event={selectedEvent}
@@ -1256,6 +1259,29 @@ export default function AttendancePage() {
             departments={departments}
             onRefresh={loadData}
           />
+        ) : (
+          <div className="glass-card" style={{ padding: '60px 24px', borderRadius: 16 }}>
+            <EmptyState
+              icon="📅"
+              title="No events to display"
+              description={
+                canManageEvents
+                  ? 'All events have been removed. Click "+ Create Event" above to schedule a new one.'
+                  : 'There are no active events scheduled for attendance tracking.'
+              }
+              action={
+                canManageEvents
+                  ? {
+                      label: '+ Create Event',
+                      onClick: () => {
+                        setEditingEvent(undefined);
+                        setShowForm(true);
+                      },
+                    }
+                  : undefined
+              }
+            />
+          </div>
         )}
       </div>
 

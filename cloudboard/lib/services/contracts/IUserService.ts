@@ -12,4 +12,6 @@ export interface IUserService {
     newPoints: number,
     reason?: string
   ): Promise<User>;
+  updateUserAvatar(userId: string, avatarUrl: string): Promise<User>;
+  invalidateCache(): void;
 }

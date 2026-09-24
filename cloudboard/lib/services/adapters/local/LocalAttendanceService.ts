@@ -8,6 +8,8 @@ import {
 import { INITIAL_EVENTS } from './seedData';
 
 const EVENTS_STORE_KEY = 'cloudboard_events';
+const EVENTS_INIT_KEY = 'cloudboard_events_init_done';
+const EVENTS_CLEARED_KEY = 'cloudboard_events_cleared';
 const ATTENDANCE_STORE_KEY = 'cloudboard_attendance';
 
 type AttendanceStoreData = Record<string, Record<string, AttendanceRecord>>;
@@ -15,22 +17,64 @@ type AttendanceStoreData = Record<string, Record<string, AttendanceRecord>>;
 function getStoredEvents(): CBEvent[] {
   if (typeof window === 'undefined') return INITIAL_EVENTS;
   try {
+    // If the user explicitly cleared/deleted all events, NEVER resurrect seed events
+    const wasCleared = window.localStorage.getItem(EVENTS_CLEARED_KEY);
+    if (wasCleared === 'true') {
+      const raw = window.localStorage.getItem(EVENTS_STORE_KEY);
+      if (raw) {
+        try {
+          return JSON.parse(raw) as CBEvent[];
+        } catch {
+          return [];
+        }
+      }
+      return [];
+    }
+
     const raw = window.localStorage.getItem(EVENTS_STORE_KEY);
-    if (raw) return JSON.parse(raw) as CBEvent[];
+    // If raw key exists in localStorage (including "[]"), honor it!
+    if (raw !== null) {
+      try {
+        const parsed = JSON.parse(raw) as CBEvent[];
+        if (Array.isArray(parsed)) {
+          if (parsed.length === 0) {
+            window.localStorage.setItem(EVENTS_CLEARED_KEY, 'true');
+          }
+          return parsed;
+        }
+      } catch {
+        return [];
+      }
+    }
+
+    // Check if initial seeding already happened before
+    const isInit = window.localStorage.getItem(EVENTS_INIT_KEY);
+    if (isInit === 'true') {
+      return [];
+    }
+
+    // First time EVER running this app on this device
+    window.localStorage.setItem(EVENTS_INIT_KEY, 'true');
     window.localStorage.setItem(
       EVENTS_STORE_KEY,
       JSON.stringify(INITIAL_EVENTS)
     );
     return INITIAL_EVENTS;
   } catch {
-    return INITIAL_EVENTS;
+    return [];
   }
 }
 
 function saveEvents(events: CBEvent[]): void {
   if (typeof window === 'undefined') return;
   try {
+    window.localStorage.setItem(EVENTS_INIT_KEY, 'true');
     window.localStorage.setItem(EVENTS_STORE_KEY, JSON.stringify(events));
+    if (events.length === 0) {
+      window.localStorage.setItem(EVENTS_CLEARED_KEY, 'true');
+    } else {
+      window.localStorage.removeItem(EVENTS_CLEARED_KEY);
+    }
   } catch (err) {
     console.error('[LocalAttendanceService] Failed to persist events', err);
   }
@@ -191,5 +235,18 @@ export class LocalAttendanceService implements IAttendanceService {
     const events = getStoredEvents();
     const updated = events.filter((e) => e.id !== id);
     saveEvents(updated);
+
+    if (typeof window !== 'undefined') {
+      try {
+        const rawAttendance = window.localStorage.getItem(ATTENDANCE_STORE_KEY);
+        if (rawAttendance) {
+          const parsed = JSON.parse(rawAttendance);
+          delete parsed[id];
+          window.localStorage.setItem(ATTENDANCE_STORE_KEY, JSON.stringify(parsed));
+        }
+      } catch (err) {
+        console.error('[LocalAttendanceService] Failed to clean up event attendance', err);
+      }
+    }
   }
 }
