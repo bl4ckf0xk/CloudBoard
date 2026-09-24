@@ -40,7 +40,7 @@ const DEFAULT_ANONYMOUS_USER: User = {
   email: '',
   avatarInitials: 'MB',
   role: 'volunteer',
-  deptId: 'engineering',
+  deptId: 'marketing-design',
   joinDate: new Date().toISOString().split('T')[0],
   totalPoints: 0,
   avatarColor: '#16a34a',
@@ -85,14 +85,28 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   const updateUserAvatar = useCallback(async (avatarUrl: string) => {
     try {
       const updated = await userService.updateUserAvatar(currentUser.id, avatarUrl);
-      setCurrentUserState(updated);
-      setAllUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+      setCurrentUserState((prev) => ({ ...prev, ...updated, avatarUrl }));
+      setAllUsers((prev) => prev.map((u) => (u.id === updated.id ? { ...u, avatarUrl } : u)));
     } catch (err) {
       logger.error('[RoleProvider] Failed to update avatar:', err);
       setCurrentUserState((prev) => ({ ...prev, avatarUrl }));
       setAllUsers((prev) => prev.map((u) => (u.id === currentUser.id ? { ...u, avatarUrl } : u)));
     }
   }, [currentUser.id]);
+
+  // Sync avatar updates from other tabs / components
+  useEffect(() => {
+    const handleAvatarUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent<{ userId: string; avatarUrl: string }>;
+      if (customEvent.detail) {
+        const { userId, avatarUrl } = customEvent.detail;
+        setCurrentUserState((prev) => (prev.id === userId ? { ...prev, avatarUrl } : prev));
+        setAllUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, avatarUrl } : u)));
+      }
+    };
+    window.addEventListener('cloudboard-avatar-updated', handleAvatarUpdate);
+    return () => window.removeEventListener('cloudboard-avatar-updated', handleAvatarUpdate);
+  }, []);
 
   const refreshUsers = useCallback(async () => {
     try {
@@ -101,7 +115,15 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
         setAllUsers(updated);
         setCurrentUserState((prev) => {
           const match = updated.find((u) => u.id === prev.id || (u.email && u.email === prev.email));
-          return match || prev;
+          if (!match) return prev;
+          const fallbackAvatar =
+            match.avatarUrl ||
+            (typeof window !== 'undefined'
+              ? window.localStorage.getItem(`cloudboard_avatar_${match.id}`) ||
+                (match.email ? window.localStorage.getItem(`cloudboard_avatar_by_email_${match.email.toLowerCase()}`) : null) ||
+                prev.avatarUrl
+              : prev.avatarUrl);
+          return { ...match, avatarUrl: fallbackAvatar };
         });
       }
     } catch (err: unknown) {
@@ -147,13 +169,30 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
                   u.id === sessionUser.sub
               );
               if (matchedUser) {
-                setCurrentUserState(matchedUser);
+                const storedAvatar =
+                  matchedUser.avatarUrl ||
+                  (typeof window !== 'undefined'
+                    ? window.localStorage.getItem(`cloudboard_avatar_${matchedUser.id}`) ||
+                      (matchedUser.email
+                        ? window.localStorage.getItem(`cloudboard_avatar_by_email_${matchedUser.email.toLowerCase()}`)
+                        : null) ||
+                      undefined
+                    : undefined) ||
+                  undefined;
+                setCurrentUserState({ ...matchedUser, avatarUrl: storedAvatar });
               } else {
+                const storedAvatar =
+                  (typeof window !== 'undefined'
+                    ? window.localStorage.getItem(`cloudboard_avatar_${sessionUser.sub}`) ||
+                      window.localStorage.getItem(`cloudboard_avatar_by_email_${sessionUser.email.toLowerCase()}`) ||
+                      undefined
+                    : undefined) || undefined;
                 setCurrentUserState({
                   id: sessionUser.sub || 'cognito-user',
                   name: sessionUser.name || sessionUser.email.split('@')[0],
                   email: sessionUser.email,
                   avatarInitials: (sessionUser.name || sessionUser.email).slice(0, 2).toUpperCase(),
+                  avatarUrl: storedAvatar,
                   role: sanitizeUserRole(sessionUser.dept),
                   deptId: 'engineering',
                   joinDate: new Date().toISOString().split('T')[0],
@@ -164,7 +203,17 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
             }
           }
           if (user && !sessionUser) {
-            setCurrentUserState(user);
+            const storedAvatar =
+              user.avatarUrl ||
+              (typeof window !== 'undefined'
+                ? window.localStorage.getItem(`cloudboard_avatar_${user.id}`) ||
+                  (user.email
+                    ? window.localStorage.getItem(`cloudboard_avatar_by_email_${user.email.toLowerCase()}`)
+                    : null) ||
+                  undefined
+                : undefined) ||
+              undefined;
+            setCurrentUserState({ ...user, avatarUrl: storedAvatar });
           }
         }
       } catch (err: unknown) {

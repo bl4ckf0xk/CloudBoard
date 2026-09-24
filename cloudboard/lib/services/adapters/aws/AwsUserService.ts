@@ -70,7 +70,18 @@ export function mapAwsMemberToUser(raw: any): User {
   const role = normalizeRole(raw.role);
   const rawPoints = raw.total_points ?? raw.totalPoints ?? raw.points ?? raw.Points ?? raw.point ?? raw.score ?? 0;
   const totalPoints = typeof rawPoints === 'number' ? rawPoints : parseInt(String(rawPoints) || '0', 10) || 0;
-  const avatarUrl = raw.avatar_url || raw.avatarUrl || undefined;
+  
+  let avatarUrl = raw.avatar_url || raw.avatarUrl || undefined;
+  if (!avatarUrl && typeof window !== 'undefined') {
+    try {
+      avatarUrl =
+        window.localStorage.getItem(`cloudboard_avatar_${id}`) ||
+        (email ? window.localStorage.getItem(`cloudboard_avatar_by_email_${email.toLowerCase()}`) : null) ||
+        undefined;
+    } catch {
+      // ignore
+    }
+  }
 
   return {
     id,
@@ -170,11 +181,23 @@ export class AwsUserService implements IUserService {
     users[idx] = updatedUser;
     this.cachedUsers = [...users];
 
-    // Persist in localStorage for fallback/offline persistence
+    // Persist in localStorage for fallback/offline persistence strictly scoped to userId/email
     if (typeof window !== 'undefined') {
       try {
+        window.localStorage.removeItem('cloudboard_user_avatar'); // Clean up any legacy generic avatar key
         window.localStorage.setItem('cloudboard_members', JSON.stringify(users));
-        window.localStorage.setItem(`cloudboard_avatar_${userId}`, avatarUrl);
+        if (avatarUrl) {
+          window.localStorage.setItem(`cloudboard_avatar_${userId}`, avatarUrl);
+          if (updatedUser.email) {
+            window.localStorage.setItem(`cloudboard_avatar_by_email_${updatedUser.email.toLowerCase()}`, avatarUrl);
+          }
+        } else {
+          window.localStorage.removeItem(`cloudboard_avatar_${userId}`);
+          if (updatedUser.email) {
+            window.localStorage.removeItem(`cloudboard_avatar_by_email_${updatedUser.email.toLowerCase()}`);
+          }
+        }
+        window.dispatchEvent(new CustomEvent('cloudboard-avatar-updated', { detail: { userId, avatarUrl } }));
       } catch (e) {
         logger.warn('[AwsUserService] Failed to persist avatar to localStorage:', e);
       }

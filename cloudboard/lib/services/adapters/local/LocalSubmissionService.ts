@@ -132,13 +132,20 @@ export class LocalSubmissionService implements ISubmissionService {
         if (rawUsers) {
           const parsedUsers = JSON.parse(rawUsers);
           if (Array.isArray(parsedUsers)) {
-            const uIdx = parsedUsers.findIndex((u: any) => u.id === targetUserId);
+            const targetLower = (targetUserId || '').toLowerCase();
+            const uIdx = parsedUsers.findIndex(
+              (u: any) =>
+                (u.id && u.id.toLowerCase() === targetLower) ||
+                (u.email && u.email.toLowerCase() === targetLower) ||
+                (u.name && u.name.toLowerCase() === targetLower)
+            );
             if (uIdx !== -1) {
               parsedUsers[uIdx].totalPoints = (parsedUsers[uIdx].totalPoints || 0) + pointsAwarded;
               window.localStorage.setItem('cloudboard_members', JSON.stringify(parsedUsers));
             }
           }
         }
+        window.dispatchEvent(new CustomEvent('contribution-submitted', { detail: updated }));
       } catch (err) {
         console.error('[LocalSubmissionService] Failed to update member points', err);
       }

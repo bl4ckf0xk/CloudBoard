@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { userService, submissionService, departmentService } from '@/lib/services';
 import { User, PointSubmission, Department } from '@/lib/services/types';
-import { getBadgeColors, getRoleMeta } from '@/lib/utils';
+import { getBadgeColors, getRoleMeta, enrichUsersWithPoints } from '@/lib/utils';
 import {
   Search,
   Users,
@@ -59,7 +59,7 @@ export default function SearchOverlay({ isOpen, onClose, initialQuery = '' }: Se
         submissionService.getSubmissions(),
         departmentService.getAllDepartments(),
       ]).then(([allUsers, allSubs, allDepts]) => {
-        setUsers(allUsers);
+        setUsers(enrichUsersWithPoints(allUsers, allSubs));
         setSubmissions(allSubs);
         setDepartments(allDepts);
       });

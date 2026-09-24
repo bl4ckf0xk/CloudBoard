@@ -3,6 +3,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { User, Department, PointSubmission } from '@/lib/services/types';
 import { submissionService, departmentService } from '@/lib/services';
+import { isUserMatch } from '@/lib/utils';
 
 interface BreakdownData {
   homePts: number;
@@ -204,7 +205,7 @@ export default function PointsBreakdown({ user }: PointsBreakdownProps) {
 
   const data: BreakdownData = useMemo(() => {
     const approved = submissions.filter(
-      (s) => s.targetUserId === user.id && s.status === 'approved'
+      (s) => isUserMatch(s.targetUserId, user) && s.status === 'approved'
     );
 
     const homePts = approved

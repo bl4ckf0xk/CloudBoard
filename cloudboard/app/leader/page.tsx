@@ -13,7 +13,7 @@ import {
   departmentService,
 } from '@/lib/services';
 import { useRouter } from 'next/navigation';
-import { formatDate, relativeTime, getBadgeColors, getRoleMeta } from '@/lib/utils';
+import { formatDate, relativeTime, getBadgeColors, getRoleMeta, enrichUsersWithPoints } from '@/lib/utils';
 import { logger } from '@/lib/logger';
 import EmptyState from '@/components/ui/EmptyState';
 import {
@@ -986,7 +986,20 @@ export default function LeaderDashboardPage() {
     }
   }, [isLeader, loadData]);
 
-  const userMap = useMemo(() => new Map(users.map((u) => [u.id, u])), [users]);
+  // Listen for real-time contribution updates
+  useEffect(() => {
+    const handleReload = () => {
+      if (isLeader) loadData();
+    };
+    window.addEventListener('contribution-submitted', handleReload);
+    return () => window.removeEventListener('contribution-submitted', handleReload);
+  }, [isLeader, loadData]);
+
+  const enrichedUsers = useMemo(() => {
+    return enrichUsersWithPoints(users, submissions);
+  }, [users, submissions]);
+
+  const userMap = useMemo(() => new Map(enrichedUsers.map((u) => [u.id, u])), [enrichedUsers]);
   const deptMap = useMemo(() => new Map(departments.map((d) => [d.id, d])), [departments]);
 
   const showToast = (msg: string, type: 'success' | 'info' = 'success') => {
@@ -1001,6 +1014,7 @@ export default function LeaderDashboardPage() {
         prev.map((u) => (u.id === userId ? { ...u, totalPoints: newPoints } : u))
       );
       showToast('Member points successfully updated', 'success');
+      window.dispatchEvent(new CustomEvent('contribution-submitted'));
     } catch (err: any) {
       showToast(err.message || 'Failed to update points', 'info');
     }
@@ -1035,17 +1049,17 @@ export default function LeaderDashboardPage() {
   };
 
   const filteredMembers = useMemo(() => {
-    return users.filter((u) => {
+    return enrichedUsers.filter((u) => {
       if (deptFilter !== 'all' && u.deptId !== deptFilter) return false;
       if (roleFilter !== 'all' && u.role !== roleFilter) return false;
       if (search && !u.name.toLowerCase().includes(search.toLowerCase())) return false;
       return true;
     });
-  }, [users, deptFilter, roleFilter, search]);
+  }, [enrichedUsers, deptFilter, roleFilter, search]);
 
   const topPerformers = useMemo(() => {
-    return [...users].sort((a, b) => b.totalPoints - a.totalPoints).slice(0, 3);
-  }, [users]);
+    return [...enrichedUsers].sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0)).slice(0, 3);
+  }, [enrichedUsers]);
 
   if (!isLeader) {
     return (

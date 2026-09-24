@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { User, Department, UserRole, PointSubmission } from '@/lib/services/types';
 import { userService, departmentService, submissionService } from '@/lib/services';
-import { ROLE_ORDER, getBadgeColors, getRoleMeta } from '@/lib/utils';
+import { ROLE_ORDER, getBadgeColors, getRoleMeta, isUserMatch, enrichUsersWithPoints } from '@/lib/utils';
 import { logger } from '@/lib/logger';
 import EmptyState from '@/components/ui/EmptyState';
 import { Trophy, Medal, Crown, Sparkles, Award } from 'lucide-react';
@@ -49,7 +49,7 @@ function Podium({
         const h = heights[idx];
         const dept = deptMap.get(user.deptId);
         const stats = statsMap.get(user.id);
-        const pts = stats && stats.points > 0 ? stats.points : user.totalPoints;
+        const pts = user.totalPoints;
 
         return (
           <div
@@ -232,32 +232,30 @@ export default function LeaderboardPage() {
     const map = new Map<string, UserContribStats>();
     for (const s of submissions) {
       if (s.status !== 'approved') continue;
-      const cur = map.get(s.targetUserId) || { count: 0, crossCount: 0, points: 0 };
-      cur.count += 1;
-      if (s.cross_dept) cur.crossCount += 1;
-      cur.points += s.points;
-      map.set(s.targetUserId, cur);
+      for (const m of members) {
+        if (isUserMatch(s.targetUserId, m)) {
+          const cur = map.get(m.id) || { count: 0, crossCount: 0, points: 0 };
+          cur.count += 1;
+          if (s.cross_dept) cur.crossCount += 1;
+          cur.points += s.points;
+          map.set(m.id, cur);
+        }
+      }
     }
     return map;
-  }, [submissions]);
+  }, [submissions, members]);
 
   const CONTRIBUTOR_ROLES = useMemo(() => ROLE_ORDER.filter((r) => r !== 'leader'), []);
 
   const rankedMembers = useMemo(() => {
-    let list = members.filter((m) => m.role !== 'leader');
+    const enriched = enrichUsersWithPoints(members, submissions);
+    let list = enriched.filter((m) => m.role !== 'leader');
     if (roleFilter !== 'all') {
       list = list.filter((m) => m.role === roleFilter);
     }
 
-    return list.sort((a, b) => {
-      const aStats = statsMap.get(a.id) || { count: 0, crossCount: 0, points: 0 };
-      const bStats = statsMap.get(b.id) || { count: 0, crossCount: 0, points: 0 };
-      const aPts = aStats.points > 0 ? aStats.points : a.totalPoints;
-      const bPts = bStats.points > 0 ? bStats.points : b.totalPoints;
-
-      return bPts - aPts;
-    });
-  }, [members, roleFilter, statsMap]);
+    return list.sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
+  }, [members, roleFilter, submissions]);
 
   const top3 = rankedMembers.slice(0, 3);
   const rest = rankedMembers.slice(3);

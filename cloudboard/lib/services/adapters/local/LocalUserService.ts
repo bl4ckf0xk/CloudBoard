@@ -97,6 +97,27 @@ export class LocalUserService implements IUserService {
     };
     users[idx] = updatedUser;
     saveUsers(users);
+
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.removeItem('cloudboard_user_avatar');
+        if (avatarUrl) {
+          window.localStorage.setItem(`cloudboard_avatar_${userId}`, avatarUrl);
+          if (updatedUser.email) {
+            window.localStorage.setItem(`cloudboard_avatar_by_email_${updatedUser.email.toLowerCase()}`, avatarUrl);
+          }
+        } else {
+          window.localStorage.removeItem(`cloudboard_avatar_${userId}`);
+          if (updatedUser.email) {
+            window.localStorage.removeItem(`cloudboard_avatar_by_email_${updatedUser.email.toLowerCase()}`);
+          }
+        }
+        window.dispatchEvent(new CustomEvent('cloudboard-avatar-updated', { detail: { userId, avatarUrl } }));
+      } catch (e) {
+        console.warn('[LocalUserService] Failed to store avatar in localStorage', e);
+      }
+    }
+
     return updatedUser;
   }
 

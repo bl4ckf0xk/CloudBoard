@@ -3,7 +3,42 @@
  * Shared helper functions, tokens, and metadata across CloudBoard.
  */
 
-import { UserRole } from './services/types';
+import { User, PointSubmission, UserRole } from './services/types';
+
+export function isUserMatch(targetIdOrEmailOrName: string | undefined | null, user: User): boolean {
+  if (!targetIdOrEmailOrName || !user) return false;
+  const target = targetIdOrEmailOrName.trim().toLowerCase();
+  const userId = (user.id || '').trim().toLowerCase();
+  const userEmail = (user.email || '').trim().toLowerCase();
+  const userName = (user.name || '').trim().toLowerCase();
+  return (
+    userId === target ||
+    userEmail === target ||
+    userName === target ||
+    target.includes(userId) ||
+    (userId.length > 5 && target.includes(userId.slice(0, 8)))
+  );
+}
+
+export function getUserApprovedPoints(user: User, submissions: PointSubmission[]): number {
+  return submissions
+    .filter((s) => s.status === 'approved' && isUserMatch(s.targetUserId, user))
+    .reduce((sum, s) => sum + (Number(s.points) || 0), 0);
+}
+
+export function calculateEffectiveUserPoints(user: User, submissions: PointSubmission[]): number {
+  const approvedPoints = getUserApprovedPoints(user, submissions);
+  const basePoints = Number(user.totalPoints) || 0;
+  return Math.max(basePoints, approvedPoints);
+}
+
+export function enrichUsersWithPoints(users: User[], submissions: PointSubmission[]): User[] {
+  return users.map((u) => ({
+    ...u,
+    totalPoints: calculateEffectiveUserPoints(u, submissions),
+  }));
+}
+
 
 // ─── Role Ranks ──────────────────────────────────────────────
 const BASE_ROLE_RANK: Record<UserRole, number> = {

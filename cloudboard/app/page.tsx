@@ -13,7 +13,7 @@ import {
   userService,
   submissionService,
 } from '@/lib/services';
-import { relativeTime, CATEGORY_META, ROLE_RANK } from '@/lib/utils';
+import { relativeTime, CATEGORY_META, ROLE_RANK, enrichUsersWithPoints } from '@/lib/utils';
 import { logger } from '@/lib/logger';
 import EmptyState from '@/components/ui/EmptyState';
 import {
@@ -391,7 +391,11 @@ export default function HomePage() {
     return () => window.removeEventListener('contribution-submitted', handleReload);
   }, [loadAll]);
 
-  const userMap = useMemo(() => new Map(users.map((u) => [u.id, u])), [users]);
+  const enrichedUsers = useMemo(() => {
+    return enrichUsersWithPoints(users, submissions);
+  }, [users, submissions]);
+
+  const userMap = useMemo(() => new Map(enrichedUsers.map((u) => [u.id, u])), [enrichedUsers]);
   const deptMap = useMemo(() => new Map(departments.map((d) => [d.id, d])), [departments]);
 
   const pendingSubmissions = useMemo(
@@ -406,12 +410,12 @@ export default function HomePage() {
 
   // Top 5 members for leaderboard
   const topMembers = useMemo(() => {
-    let filtered = [...users];
+    let filtered = [...enrichedUsers];
     if (selectedDeptFilter !== 'all') {
       filtered = filtered.filter((u) => u.deptId === selectedDeptFilter);
     }
-    return filtered.sort((a, b) => b.totalPoints - a.totalPoints).slice(0, 5);
-  }, [users, selectedDeptFilter]);
+    return filtered.sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0)).slice(0, 5);
+  }, [enrichedUsers, selectedDeptFilter]);
 
   const topScore = topMembers[0]?.totalPoints || 1;
 
@@ -419,14 +423,14 @@ export default function HomePage() {
   const topDepts = useMemo(() => {
     return [...departments]
       .map((d) => {
-        const deptPoints = users
+        const deptPoints = enrichedUsers
           .filter((u) => u.deptId === d.id)
-          .reduce((sum, u) => sum + u.totalPoints, 0);
+          .reduce((sum, u) => sum + (u.totalPoints || 0), 0);
         return { ...d, totalPoints: deptPoints };
       })
       .sort((a, b) => b.totalPoints - a.totalPoints)
       .slice(0, 5);
-  }, [departments, users]);
+  }, [departments, enrichedUsers]);
 
   // Recent recognition items
   const recentFeed = useMemo(() => {

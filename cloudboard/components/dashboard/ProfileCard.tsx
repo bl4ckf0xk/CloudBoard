@@ -3,7 +3,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { User, Department, PointSubmission } from '@/lib/services/types';
 import { userService, submissionService, departmentService } from '@/lib/services';
-import { ROLE_RANK, getBadgeColors, getRoleMeta } from '@/lib/utils';
+import { ROLE_RANK, getBadgeColors, getRoleMeta, isUserMatch } from '@/lib/utils';
 import { useRole } from '@/lib/roleContext';
 import { Camera, Trash2, Shield, Award, Sparkles, TrendingUp, CheckCircle2, Clock } from 'lucide-react';
 
@@ -73,17 +73,17 @@ export default function ProfileCard({ user }: ProfileCardProps) {
   const confirmedPoints = useMemo(
     () =>
       submissions
-        .filter((s) => s.targetUserId === activeUser.id && s.status === 'approved')
-        .reduce((acc, s) => acc + s.points, 0),
-    [submissions, activeUser.id]
+        .filter((s) => isUserMatch(s.targetUserId, activeUser) && s.status === 'approved')
+        .reduce((acc, s) => acc + (Number(s.points) || 0), 0),
+    [submissions, activeUser]
   );
 
   const pendingPoints = useMemo(
     () =>
       submissions
-        .filter((s) => s.targetUserId === activeUser.id && s.status === 'pending')
-        .reduce((acc, s) => acc + s.points, 0),
-    [submissions, activeUser.id]
+        .filter((s) => isUserMatch(s.targetUserId, activeUser) && s.status === 'pending')
+        .reduce((acc, s) => acc + (Number(s.points) || 0), 0),
+    [submissions, activeUser]
   );
 
   // Robust lifetime points display (highest of stored or verified submission sum)

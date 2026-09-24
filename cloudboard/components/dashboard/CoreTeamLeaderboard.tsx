@@ -3,22 +3,22 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { User, PointSubmission, Department } from '@/lib/services/types';
 import { userService, submissionService, departmentService } from '@/lib/services';
-import { ROLE_RANK, BADGE_COLORS, ROLE_META, getBadgeColors, getRoleMeta, getRoleRank } from '@/lib/utils';
+import { ROLE_RANK, BADGE_COLORS, ROLE_META, getBadgeColors, getRoleMeta, getRoleRank, isUserMatch, calculateEffectiveUserPoints } from '@/lib/utils';
 
-function getApprovedPoints(userId: string, submissions: PointSubmission[]): number {
+function getApprovedPoints(user: User, submissions: PointSubmission[]): number {
   return submissions
-    .filter((s) => s.targetUserId === userId && s.status === 'approved')
-    .reduce((a, s) => a + s.points, 0);
+    .filter((s) => isUserMatch(s.targetUserId, user) && s.status === 'approved')
+    .reduce((a, s) => a + (Number(s.points) || 0), 0);
 }
 
-function getCrossDeptPoints(userId: string, submissions: PointSubmission[]): number {
+function getCrossDeptPoints(user: User, submissions: PointSubmission[]): number {
   return submissions
-    .filter((s) => s.targetUserId === userId && s.status === 'approved' && s.cross_dept)
-    .reduce((a, s) => a + s.points, 0);
+    .filter((s) => isUserMatch(s.targetUserId, user) && s.status === 'approved' && s.cross_dept)
+    .reduce((a, s) => a + (Number(s.points) || 0), 0);
 }
 
-function getSubmissionsGiven(userId: string, submissions: PointSubmission[]): number {
-  return submissions.filter((s) => s.submitterId === userId).length;
+function getSubmissionsGiven(user: User, submissions: PointSubmission[]): number {
+  return submissions.filter((s) => isUserMatch(s.submitterId, user)).length;
 }
 
 function RankMedal({ rank }: { rank: number }) {
@@ -243,13 +243,12 @@ export default function CoreTeamLeaderboard({ currentUser }: CoreTeamLeaderboard
   const leaderboardData = useMemo(() => {
     return eligibleUsers
       .map((u) => {
-        const subPts = getApprovedPoints(u.id, submissions);
-        const pts = subPts > 0 ? subPts : (u.totalPoints || 0);
+        const pts = calculateEffectiveUserPoints(u, submissions);
         return {
           user: u,
           approvedPts: pts,
-          crossPts: getCrossDeptPoints(u.id, submissions),
-          givenCount: getSubmissionsGiven(u.id, submissions),
+          crossPts: getCrossDeptPoints(u, submissions),
+          givenCount: getSubmissionsGiven(u, submissions),
         };
       })
       .sort((a, b) => b.approvedPts - a.approvedPts);

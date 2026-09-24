@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useRole } from '@/lib/roleContext';
@@ -17,7 +17,6 @@ import {
   Award,
   ChevronLeft,
   ChevronRight,
-  Sparkles,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -47,13 +46,12 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/leader', label: 'Leader Panel', icon: Award, leaderOnly: true },
 ];
 
-const DEPT_COLORS: Record<string, string> = {
-  'dept-eng': '#6366f1',
-  'dept-design': '#10b981',
-  'dept-marketing': '#f59e0b',
-  'dept-ops': '#8b5cf6',
-  'dept-hr': '#ec4899',
-  'dept-sales': '#3b82f6',
+const DEPT_FALLBACK_COLORS: Record<string, string> = {
+  'marketing-design': '#f59e0b',
+  'budget-io': '#10b981',
+  'delegate-handling': '#8b5cf6',
+  'engineering': '#6366f1',
+  'event-coordination': '#f43f5e',
 };
 
 export default function Sidebar({
@@ -65,9 +63,29 @@ export default function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const { currentUser } = useRole();
+  const [currentDeptParam, setCurrentDeptParam] = useState<string | null>(null);
+
+  // Synchronize URL search params for active team selection
+  useEffect(() => {
+    const checkQuery = () => {
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        setCurrentDeptParam(params.get('dept'));
+      }
+    };
+    checkQuery();
+    window.addEventListener('popstate', checkQuery);
+    window.addEventListener('cloudboard-dept-selected', checkQuery);
+    return () => {
+      window.removeEventListener('popstate', checkQuery);
+      window.removeEventListener('cloudboard-dept-selected', checkQuery);
+    };
+  }, [pathname]);
 
   const roleMeta = getRoleMeta(currentUser.role);
   const badgeColors = getBadgeColors(currentUser.role);
+
+  const cleanPath = (pathname?.replace(/\/$/, '') || '') || '/';
 
   return (
     <>
@@ -111,7 +129,10 @@ export default function Sidebar({
         >
           <Link
             href="/"
-            onClick={onCloseMobile}
+            onClick={() => {
+              setCurrentDeptParam(null);
+              onCloseMobile();
+            }}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -167,7 +188,12 @@ export default function Sidebar({
           }}
         >
           {NAV_ITEMS.map((item) => {
-            const isActive = pathname === item.href;
+            const itemCleanHref = (item.href.replace(/\/$/, '') || '') || '/';
+            const isActive =
+              itemCleanHref === '/'
+                ? cleanPath === '/' || cleanPath === ''
+                : cleanPath === itemCleanHref || (cleanPath.startsWith(itemCleanHref) && itemCleanHref !== '/');
+
             const isDeptHeadRestricted =
               item.deptHeadOnly && ROLE_RANK[currentUser.role] < ROLE_RANK['dept-head'];
             const isLeaderRestricted =
@@ -182,7 +208,12 @@ export default function Sidebar({
               <Link
                 key={item.href}
                 href={item.href}
-                onClick={onCloseMobile}
+                onClick={() => {
+                  if (item.href === '/departments') {
+                    setCurrentDeptParam(null);
+                  }
+                  onCloseMobile();
+                }}
                 data-tooltip={collapsed ? item.label : undefined}
                 className={`sidebar-link ${isActive ? 'active' : ''}`}
                 style={{
@@ -217,83 +248,104 @@ export default function Sidebar({
             );
           })}
 
-          {/* TEAMS Section — Leader Only */}
-          {ROLE_RANK[currentUser.role] >= ROLE_RANK['leader'] && (
-            <div
-              style={{
-                marginTop: 20,
-                paddingTop: 16,
-                borderTop: '1px solid var(--border-subtle)',
-              }}
-            >
-              {!collapsed ? (
-                <div
-                  style={{
-                    fontSize: '0.68rem',
-                    fontWeight: 800,
-                    letterSpacing: '0.08em',
-                    textTransform: 'uppercase',
-                    color: 'var(--text-muted)',
-                    padding: '4px 14px 10px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <span>Teams</span>
-                  <span style={{ fontSize: '0.6rem', color: 'var(--accent-amber)', fontWeight: 700 }}>LEADER</span>
-                </div>
-              ) : (
-                <div
-                  style={{
-                    height: 1,
-                    background: 'transparent',
-                    margin: '4px 0',
-                  }}
-                />
-              )}
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {departments.slice(0, 5).map((dept) => {
-                  const color = DEPT_COLORS[dept.id] || '#6366f1';
-                  return (
-                    <Link
-                      key={dept.id}
-                      href={`/departments?dept=${dept.id}`}
-                      onClick={onCloseMobile}
-                      data-tooltip={collapsed ? dept.name : undefined}
-                      className="sidebar-link"
-                      style={{
-                        justifyContent: collapsed ? 'center' : 'flex-start',
-                        padding: collapsed ? '8px 0' : '8px 14px',
-                        fontSize: '0.82rem',
-                      }}
-                    >
-                      <span
-                        className="sidebar-team-dot"
-                        style={{
-                          background: color,
-                          boxShadow: `0 0 8px ${color}50`,
-                        }}
-                      />
-                      {!collapsed && (
-                        <span
-                          style={{
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            color: 'var(--text-secondary)',
-                          }}
-                        >
-                          {dept.name}
-                        </span>
-                      )}
-                    </Link>
-                  );
-                })}
+          {/* TEAMS Section — Accessible to all users for direct department overviews */}
+          <div
+            style={{
+              marginTop: 20,
+              paddingTop: 16,
+              borderTop: '1px solid var(--border-subtle)',
+            }}
+          >
+            {!collapsed ? (
+              <div
+                style={{
+                  fontSize: '0.68rem',
+                  fontWeight: 800,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  color: 'var(--text-muted)',
+                  padding: '4px 14px 10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <span>Teams</span>
+                <span style={{ fontSize: '0.6rem', color: 'var(--accent-indigo)', fontWeight: 700 }}>OVERVIEW</span>
               </div>
+            ) : (
+              <div
+                style={{
+                  height: 1,
+                  background: 'transparent',
+                  margin: '4px 0',
+                }}
+              />
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {departments.slice(0, 5).map((dept) => {
+                const color = dept.color || DEPT_FALLBACK_COLORS[dept.id] || '#6366f1';
+                const isTeamActive = cleanPath === '/departments' && currentDeptParam === dept.id;
+
+                return (
+                  <Link
+                    key={dept.id}
+                    href={`/departments?dept=${dept.id}`}
+                    onClick={(e) => {
+                      if (cleanPath === '/departments') {
+                        e.preventDefault();
+                        if (typeof window !== 'undefined') {
+                          window.history.pushState(null, '', `/departments?dept=${dept.id}`);
+                          window.dispatchEvent(
+                            new CustomEvent('cloudboard-dept-selected', { detail: { deptId: dept.id } })
+                          );
+                        }
+                      } else {
+                        if (typeof window !== 'undefined') {
+                          window.dispatchEvent(
+                            new CustomEvent('cloudboard-dept-selected', { detail: { deptId: dept.id } })
+                          );
+                        }
+                      }
+                      setCurrentDeptParam(dept.id);
+                      onCloseMobile();
+                    }}
+                    data-tooltip={collapsed ? dept.name : undefined}
+                    className={`sidebar-link ${isTeamActive ? 'active' : ''}`}
+                    style={{
+                      justifyContent: collapsed ? 'center' : 'flex-start',
+                      padding: collapsed ? '8px 0' : '8px 14px',
+                      fontSize: '0.82rem',
+                    }}
+                  >
+                    <span
+                      className="sidebar-team-dot"
+                      style={{
+                        background: color,
+                        boxShadow: isTeamActive ? `0 0 10px ${color}` : `0 0 6px ${color}50`,
+                        transform: isTeamActive ? 'scale(1.2)' : 'scale(1)',
+                        transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                      }}
+                    />
+                    {!collapsed && (
+                      <span
+                        style={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          color: isTeamActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+                          fontWeight: isTeamActive ? 700 : 500,
+                        }}
+                      >
+                        {dept.name}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
             </div>
-          )}
+          </div>
         </div>
 
         {/* User Mini Profile & Collapse Toggle at Bottom */}
@@ -336,9 +388,18 @@ export default function Sidebar({
                 fontSize: 13,
                 fontWeight: 800,
                 flexShrink: 0,
+                overflow: 'hidden',
               }}
             >
-              {currentUser.avatarInitials}
+              {currentUser.avatarUrl ? (
+                <img
+                  src={currentUser.avatarUrl}
+                  alt={currentUser.name}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              ) : (
+                currentUser.avatarInitials
+              )}
             </span>
 
             {!collapsed && (

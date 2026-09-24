@@ -6,7 +6,7 @@
     "dev": "next dev",
     "dev:turbo": "next dev --turbopack",
     "build": "next build",
-    "deploy:s3": "npm run build && aws s3 sync out/ s3://${CLOUDBOARD_S3_BUCKET:-cloudboard-frontend-ap-south-1} --delete --cache-control 'public, max-age=31536000, immutable' --exclude '*.html' && aws s3 sync out/ s3://${CLOUDBOARD_S3_BUCKET:-cloudboard-frontend-ap-south-1} --delete --cache-control 'public, max-age=0, must-revalidate' --include '*.html'",
+    "deploy:s3": "npm run build && aws s3 sync out/ s3://${CLOUDBOARD_S3_BUCKET:-cloudboard-website} --delete --cache-control 'public, max-age=31536000, immutable' --exclude '*.html' && aws s3 sync out/ s3://${CLOUDBOARD_S3_BUCKET:-cloudboard-website} --delete --cache-control 'public, max-age=0, must-revalidate' --include '*.html'",
     "deploy:invalidate": "aws cloudfront create-invalidation --distribution-id ${CLOUDBOARD_CLOUDFRONT_DIST_ID} --paths '/*'",
     "start": "next start",
     "lint": "next lint"
