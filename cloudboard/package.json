@@ -1,0 +1,36 @@
+{
+  "name": "cloudboard",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "dev:turbo": "next dev --turbopack",
+    "build": "next build",
+    "deploy:s3": "npm run build && aws s3 sync out/ s3://${CLOUDBOARD_S3_BUCKET:-cloudboard-frontend-ap-south-1} --delete --cache-control 'public, max-age=31536000, immutable' --exclude '*.html' && aws s3 sync out/ s3://${CLOUDBOARD_S3_BUCKET:-cloudboard-frontend-ap-south-1} --delete --cache-control 'public, max-age=0, must-revalidate' --include '*.html'",
+    "deploy:invalidate": "aws cloudfront create-invalidation --distribution-id ${CLOUDBOARD_CLOUDFRONT_DIST_ID} --paths '/*'",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@next/swc-darwin-arm64": "^16.2.9",
+    "framer-motion": "^11.18.2",
+    "lucide-react": "^0.511.0",
+    "next": "15.5.24",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^15.5.24",
+    "postcss": "^8.5.26",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5"
+  },
+  "overrides": {
+    "postcss": "^8.5.26"
+  }
+}
