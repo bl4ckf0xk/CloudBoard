@@ -1,4 +1,4 @@
-import { Department, User, PointSubmission, CBEvent } from '../../types';
+﻿import { Department, User, PointSubmission, CBEvent } from '../../types';
 
 export const INITIAL_DEPARTMENTS: Department[] = [
   {
@@ -177,9 +177,9 @@ export const INITIAL_USERS: User[] = [
   },
   {
     id: 'user-08',
-    name: 'Thidas',
-    email: 'thidas@cloudboard.internal',
-    avatarInitials: 'TH',
+    name: 'Marcus Vance',
+    email: 'marcus.v@cloudboard.internal',
+    avatarInitials: 'MV',
     role: 'dept-head',
     deptId: 'engineering',
     joinDate: '2024-03-20',

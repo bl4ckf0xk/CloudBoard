@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, {
   createContext,
@@ -79,8 +79,8 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   const [allUsers, setAllUsers] = useState<User[]>(initialSeed);
   const [currentUser, setCurrentUserState] = useState<User>(defaultUser);
   const [cognitoUser, setCognitoUser] = useState<CognitoUserSession | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [isLoadingAuth, setIsLoadingAuth] = useState<boolean>(true);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!isAwsBackend);
+  const [isLoadingAuth, setIsLoadingAuth] = useState<boolean>(isAwsBackend);
 
   const updateUserAvatar = useCallback(async (avatarUrl: string) => {
     try {
@@ -134,6 +134,30 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let isMounted = true;
     async function loadSession() {
+      if (!isAwsBackend) {
+        try {
+          const [users, user] = await Promise.all([
+            userService.getAllUsers(),
+            userService.getCurrentUser(),
+          ]);
+          if (isMounted) {
+            if (Array.isArray(users) && users.length > 0) {
+              setAllUsers(users);
+              const leader = users.find((u) => u.role === 'leader') ?? users[0];
+              setCurrentUserState(leader);
+            }
+            setIsAuthenticated(true);
+            setIsLoadingAuth(false);
+          }
+        } catch (demoErr) {
+          logger.warn('[RoleProvider] Demo load error:', demoErr);
+          if (isMounted) {
+            setIsAuthenticated(true);
+            setIsLoadingAuth(false);
+          }
+        }
+        return;
+      }
       try {
         let sessionUser = getSessionUser();
         let authed = isUserAuthenticated();

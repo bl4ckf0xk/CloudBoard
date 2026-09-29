@@ -1,4 +1,4 @@
-import { IUserService } from '../../contracts/IUserService';
+﻿import { IUserService } from '../../contracts/IUserService';
 import { User, UserRole, DeptId } from '../../types';
 import { INITIAL_USERS } from './seedData';
 
@@ -16,23 +16,23 @@ function sanitizeUser(u: any): User {
 export function migrateUsers(rawUsers: any[]): User[] {
   if (!Array.isArray(rawUsers) || rawUsers.length === 0) return INITIAL_USERS;
 
-  let hasThidas = false;
+  let hasMarcus = false;
   const migrated = rawUsers.map((u: any) => {
     const sanitized = sanitizeUser(u);
-    // Ensure user-08 is Thidas (Dept Head of Engineering)
+    // Ensure user-08 is Marcus Vance (Dept Head of Engineering)
     if (
       sanitized.id === 'user-08' ||
-      (sanitized.email && sanitized.email.toLowerCase().includes('thidas')) ||
-      (sanitized.name && sanitized.name.toLowerCase().includes('thidas')) ||
+      (sanitized.email && sanitized.email.toLowerCase().includes('marcus')) ||
+      (sanitized.name && sanitized.name.toLowerCase().includes('marcus')) ||
       (sanitized.name && sanitized.name.toLowerCase().includes('nikhil'))
     ) {
-      hasThidas = true;
+      hasMarcus = true;
       return {
         ...sanitized,
         id: 'user-08',
-        name: 'Thidas',
-        email: 'thidas@cloudboard.internal',
-        avatarInitials: 'TH',
+        name: 'Marcus Vance',
+        email: 'marcus.v@cloudboard.internal',
+        avatarInitials: 'MV',
         role: 'dept-head' as UserRole,
         deptId: 'engineering' as DeptId,
         avatarColor: '#4338ca',
@@ -70,12 +70,12 @@ export function migrateUsers(rawUsers: any[]): User[] {
     return sanitized;
   });
 
-  if (!hasThidas) {
+  if (!hasMarcus) {
     migrated.push({
       id: 'user-08',
-      name: 'Thidas',
-      email: 'thidas@cloudboard.internal',
-      avatarInitials: 'TH',
+      name: 'Marcus Vance',
+      email: 'marcus.v@cloudboard.internal',
+      avatarInitials: 'MV',
       role: 'dept-head',
       deptId: 'engineering',
       joinDate: '2024-03-20',
