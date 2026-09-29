@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, {
   createContext,
@@ -25,6 +25,7 @@ import {
 import { logger } from '@/lib/logger';
 
 const isAwsBackend = process.env.NEXT_PUBLIC_DATA_SOURCE === 'aws';
+const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
 
 const VALID_ROLES: Set<UserRole> = new Set(['leader', 'dept-head', 'committee', 'volunteer']);
 
@@ -79,8 +80,8 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   const [allUsers, setAllUsers] = useState<User[]>(initialSeed);
   const [currentUser, setCurrentUserState] = useState<User>(defaultUser);
   const [cognitoUser, setCognitoUser] = useState<CognitoUserSession | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!isAwsBackend);
-  const [isLoadingAuth, setIsLoadingAuth] = useState<boolean>(isAwsBackend);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(isDemoMode || !isAwsBackend);
+  const [isLoadingAuth, setIsLoadingAuth] = useState<boolean>(!isDemoMode && isAwsBackend);
 
   const updateUserAvatar = useCallback(async (avatarUrl: string) => {
     try {
@@ -134,7 +135,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let isMounted = true;
     async function loadSession() {
-      if (!isAwsBackend) {
+      if (isDemoMode || !isAwsBackend) {
         try {
           const [users, user] = await Promise.all([
             userService.getAllUsers(),

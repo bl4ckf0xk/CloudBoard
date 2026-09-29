@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React from 'react';
 import { useRole } from '@/lib/roleContext';
@@ -6,9 +6,9 @@ import LoginScreen from '@/components/auth/LoginScreen';
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoadingAuth } = useRole();
-  const isDemoMode = process.env.NEXT_PUBLIC_DATA_SOURCE !== 'aws';
+  const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
 
-  // Show loading splash while validating cached tokens (AWS mode only)
+  // Show loading splash while validating cached tokens (production non-demo AWS mode only)
   if (!isDemoMode && isLoadingAuth) {
     return (
       <div
@@ -41,7 +41,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
           ⚡
         </div>
         <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#94a3b8', letterSpacing: '-0.01em' }}>
-          Verifying AWS Cognito Session...
+          Connecting to CloudBoard Demo API Gateway...
         </div>
       </div>
     );

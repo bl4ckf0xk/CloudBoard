@@ -1,0 +1,110 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudBoard Demo Serverless Backend for AWS Zero to Shipped Hackathon'
+
+Resources:
+  DemoLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: CloudBoardDemoLambdaRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DynamoDBDemoAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource:
+                  - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/CloudBoardDemoTable*'
+
+  DemoBackendFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: CloudBoardDemoBackendFunction
+      Runtime: nodejs20.x
+      Handler: index.handler
+      MemorySize: 256
+      Timeout: 15
+      Role: !GetAtt DemoLambdaRole.Arn
+      Code:
+        S3Bucket: cloudboard-demo
+        S3Key: backend/lambda.zip
+      Environment:
+        Variables:
+          TABLE_NAME: CloudBoardDemoTable
+      Tags:
+        - Key: Project
+          Value: CloudBoard
+        - Key: Event
+          Value: ZeroToShipped
+
+  DemoHttpApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: CloudBoardDemoApi
+      ProtocolType: HTTP
+      CorsConfiguration:
+        AllowOrigins:
+          - '*'
+        AllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        AllowHeaders:
+          - '*'
+
+  DemoIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref DemoHttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt DemoBackendFunction.Arn
+      PayloadFormatVersion: '2.0'
+
+  DemoRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref DemoHttpApi
+      RouteKey: '$default'
+      Target: !Join ['/', ['integrations', !Ref DemoIntegration]]
+
+  DemoStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref DemoHttpApi
+      StageName: '$default'
+      AutoDeploy: true
+
+  DemoLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt DemoBackendFunction.Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${DemoHttpApi}/*/*'
+
+Outputs:
+  ApiEndpoint:
+    Description: 'HTTP API Gateway Endpoint URL'
+    Value: !GetAtt DemoHttpApi.ApiEndpoint
+  FunctionArn:
+    Description: 'Lambda Function ARN'
+    Value: !GetAtt DemoBackendFunction.Arn
